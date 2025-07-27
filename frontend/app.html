@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhoenixLocker Protocol | Easy Token Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 50%, #d946ef 100%);
+        }
+        .phoenix-animation {
+            animation: phoenix-rise 3s ease-in-out infinite alternate;
+        }
+        @keyframes phoenix-rise {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        .spinner {
+            border: 4px solid #374151;
+            border-top: 4px solid #f97316;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .glass-card {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen" style="transform: scale(0.75); transform-origin: top left; width: 133.33%; height: 133.33%;">
+    <!-- Navigation -->
+    <nav class="py-6 px-4 sm:px-12 flex justify-between items-center">
+        <a href="index.html" class="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+            <i class="fas fa-fire text-2xl text-orange-500 phoenix-animation"></i>
+            <span class="text-xl font-bold bg-clip-text text-transparent gradient-bg">PhoenixLocker</span>
+        </a>
+        <div class="flex items-center space-x-4">
+            <div id="wallet-status" class="text-sm">
+                <button onclick="connectWallet()" id="nav-connect-btn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-orange-500/20">
+                        Connect Wallet
+                    </button>
+                <div id="wallet-connected" class="flex items-center space-x-3" style="display: none;">
+                    <span id="wallet-address-nav" class="text-gray-300 font-mono bg-gray-800 px-3 py-2 rounded-lg"></span>
+                    <button onclick="disconnectWallet()" id="nav-disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105">
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="min-h-screen flex flex-col">
+        <main class="flex-grow">
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+
+
+                <!-- Connection Alert -->
+                <div id="connection-alert" class="text-center py-12 mb-8">
+                    <div class="max-w-md mx-auto">
+                        <div class="mb-6">
+                            <i class="fas fa-wallet text-4xl text-orange-500 mb-4"></i>
+                            <h2 class="text-2xl font-bold mb-2">Connect Your Wallet</h2>
+                            <p class="text-gray-400">Connect your MetaMask wallet to start managing your Token</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="hidden text-center py-8">
+                    <div class="spinner mb-4"></div>
+                    <p class="text-gray-300">Processing...</p>
+                </div>
+
+                <!-- Alerts Container -->
+                <div id="alerts" class="mb-6"></div>
+
+                <!-- Hero Stats Section -->
+                <div class="text-center mb-12">
+                    <h1 class="text-3xl md:text-4xl font-bold mb-4">
+                        <span class="bg-clip-text text-transparent gradient-bg">You Token Found Dashboard</span>
+                    </h1>
+                    <p class="text-gray-400 mb-8 max-w-2xl mx-auto">Manage your Token with smart time-locked withdrawals for better savings control</p>
+                    
+                    <!-- Key Stats -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-green-400" id="user-balance">0</div>
+                            <div class="text-gray-400 text-sm mt-1">My Lock Balance</div>
+                            <div class="text-gray-500 text-xs">USDT</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-yellow-400" id="wallet-usdt-balance">0</div>
+                            <div class="text-gray-400 text-sm mt-1">My USDT</div>
+                            <div class="text-gray-500 text-xs">Available</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-blue-400" id="eth-balance">0</div>
+                            <div class="text-gray-400 text-sm mt-1">My ETH</div>
+                            <div class="text-gray-500 text-xs">For Fees</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-purple-400" id="weekly-withdrawable">0</div>
+                            <div class="text-gray-400 text-sm mt-1">Weekly Max</div>
+                            <div class="text-gray-500 text-xs">USDT</div>
+                            <div class="text-gray-500 text-xs mt-1" id="weekly-time-limit">78 weeks left</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-pink-400" id="monthly-withdrawable">0</div>
+                            <div class="text-gray-400 text-sm mt-1">Monthly Max</div>
+                            <div class="text-gray-500 text-xs">USDT</div>
+                            <div class="text-gray-500 text-xs mt-1" id="monthly-time-limit">18 months left</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Cards -->
+                <div class="max-w-4xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                        <!-- Deposit Card -->
+                        <div class="glass-card rounded-2xl p-8 hover:glow-effect transition-all duration-300">
+                            <div class="text-center mb-6">
+                                <div class="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-plus text-2xl text-orange-500"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold mb-2">Add Token</h3>
+                                <p class="text-gray-400 text-sm">Put USDT into your savings vault</p>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="deposit-amount" class="block text-sm font-medium text-gray-300 mb-2">How Much (USDT)</label>
+                                    <input type="number" id="deposit-amount" placeholder="0.00" step="0.000001" 
+                                           class="w-full px-4 py-4 bg-gray-800/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all text-center text-lg font-mono">
+                                </div>
+                                <button onclick="deposit()" id="deposit-btn" 
+                                        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-orange-500/20">
+                                    <i class="fas fa-arrow-up mr-2"></i>Add Now
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Withdraw Card -->
+                        <div class="glass-card rounded-2xl p-8 hover:glow-effect transition-all duration-300">
+                            <div class="text-center mb-6">
+                                <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-arrow-down text-2xl text-blue-500"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold mb-2">Take Token</h3>
+                                <p class="text-gray-400 text-sm">Get your Token with time limits</p>
+                            </div>
+                            <div class="flex flex-col justify-end h-[160px] space-y-4">
+                                <button onclick="withdrawWeekly()" id="withdraw-weekly-btn" 
+                                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20">
+                                    <i class="fas fa-calendar-week"></i>
+                                    <span>Weekly Take</span>
+                                </button>
+                                <button onclick="withdrawMonthly()" id="withdraw-monthly-btn" 
+                                        class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg shadow-green-500/20">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Monthly Take</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 px-4 sm:px-12 border-t border-gray-800/50 mt-12">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center space-x-2 mb-4 md:mb-0">
+                        <i class="fas fa-fire text-xl text-orange-500 phoenix-animation"></i>
+                        <span class="text-lg font-bold bg-clip-text text-transparent gradient-bg">PhoenixLocker Protocol</span>
+                    </div>
+
+                </div>
+                <div class="mt-6 text-center text-gray-500 text-sm">
+                    © 2023 PhoenixLocker Protocol. All rights reserved.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 合约地址和ABI
+        const PHOENIX_LOCKER_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0';
+        const MOCK_USDT_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
+        
+        // 简化的ABI
+        const PHOENIX_LOCKER_ABI = [
+            'function deposit(uint256 amount) external',
+            'function withdrawDaily() external',
+            'function withdrawWeekly() external',
+            'function withdrawMonthly() external',
+
+            'function getUserBalance(address user) external view returns (uint256, uint256, uint256)',
+            'function getUserWithdrawableAmounts(address user) external view returns (uint256, uint256, uint256)',
+            'function getTotalContractBalance() external view returns (uint256)',
+
+            'event Deposit(address indexed user, uint256 amount, uint256 timestamp)',
+            'event Withdraw(address indexed user, uint256 amount, uint256 timestamp, bool isWeekly)',
+
+        ];
+        
+        const USDT_ABI = [
+            'function balanceOf(address owner) external view returns (uint256)',
+            'function approve(address spender, uint256 amount) external returns (bool)',
+            'function allowance(address owner, address spender) external view returns (uint256)',
+            'function decimals() external view returns (uint8)'
+        ];
+        
+        let provider, signer, phoenixLocker, usdtContract, userAddress;
+        
+        // 连接钱包
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum !== 'undefined') {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    
+                    phoenixLocker = new ethers.Contract(PHOENIX_LOCKER_ADDRESS, PHOENIX_LOCKER_ABI, signer);
+                    usdtContract = new ethers.Contract(MOCK_USDT_ADDRESS, USDT_ABI, signer);
+                    
+                    const shortAddress = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
+                    document.getElementById('wallet-address-nav').textContent = shortAddress;
+                    document.getElementById('nav-connect-btn').style.display = 'none';
+                    document.getElementById('wallet-connected').style.display = 'flex';
+                    document.getElementById('connection-alert').style.display = 'none';
+        
+                    
+                    await updateETHBalance();
+                    await updateWalletUSDTBalance();
+                    showAlert('Wallet linked successfully!', 'success');
+                    await updateUI();
+                } else {
+                    showAlert('Please install MetaMask wallet app', 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to connect wallet: ' + error.message, 'error');
+            }
+        }
+        
+        // 断开钱包连接
+        function disconnectWallet() {
+            userAddress = null;
+            provider = null;
+            signer = null;
+            phoenixLocker = null;
+            usdtContract = null;
+            
+            // Reset UI to disconnected state
+            document.getElementById('nav-connect-btn').style.display = 'inline-block';
+            document.getElementById('wallet-connected').style.display = 'none';
+            document.getElementById('connection-alert').style.display = 'block';
+
+            
+            // Clear displayed data
+            document.getElementById('user-balance').textContent = '0';
+            document.getElementById('wallet-usdt-balance').textContent = '0';
+            document.getElementById('eth-balance').textContent = '0';
+            document.getElementById('weekly-withdrawable').textContent = '0';
+            document.getElementById('monthly-withdrawable').textContent = '0';
+            document.getElementById('weekly-time-limit').textContent = '78 weeks left';
+            document.getElementById('monthly-time-limit').textContent = '18 months left';
+
+            
+            showAlert('Wallet disconnected successfully', 'success');
+        }
+        
+        // 存款
+        async function deposit() {
+            try {
+                const amount = document.getElementById('deposit-amount').value;
+                if (!amount || amount <= 0) {
+                    showAlert('Please enter a valid amount to add', 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                const amountWei = ethers.utils.parseUnits(amount, 6);
+                
+                // 检查授权
+                const allowance = await usdtContract.allowance(userAddress, PHOENIX_LOCKER_ADDRESS);
+                if (allowance.lt(amountWei)) {
+                    showAlert('Getting permission to use your USDT...', 'info');
+                    const approveTx = await usdtContract.approve(PHOENIX_LOCKER_ADDRESS, amountWei);
+                    await approveTx.wait();
+                }
+                
+                showAlert('Adding Token...', 'info');
+                const tx = await phoenixLocker.deposit(amountWei);
+                await tx.wait();
+                
+                showAlert('Token added successfully!', 'success');
+                document.getElementById('deposit-amount').value = '';
+                await updateUI();
+                await updateETHBalance();
+                await updateWalletUSDTBalance();
+            } catch (error) {
+                // 处理特定的区块标签错误
+                if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
+                } else if (error.message.includes('missing revert data')) {
+                    showAlert('Contract call failed, please check network connection and contract address', 'error');
+                } else if (error.message.includes('insufficient funds') || error.message.includes('ERC20InsufficientBalance')) {
+                    showAlert('Insufficient USDT balance, please check your wallet balance', 'error');
+                } else if (error.message.includes('UNPREDICTABLE_GAS_LIMIT')) {
+                    showAlert('Transaction may fail, please check if USDT balance is sufficient', 'error');
+                } else {
+                    showAlert('Failed to add Token, please try again', 'error');
+                }
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // 按周提取
+        async function withdrawWeekly() {
+            try {
+                showLoading(true);
+                const tx = await phoenixLocker.withdrawWeekly();
+                await tx.wait();
+                showAlert('Weekly Token taken successfully!', 'success');
+                await updateUI();
+                await updateETHBalance();
+                await updateWalletUSDTBalance();
+            } catch (error) {
+                let errorMessage = 'Failed to take Token';
+                if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    errorMessage = 'Network sync issue, please switch networks in MetaMask or reset account to clear cache';
+                } else if (error.message.includes('missing revert data')) {
+                    errorMessage = 'Contract call failed, please check network connection and contract address';
+                } else if (error.message.includes('Wait 7 days')) {
+                    errorMessage = 'Please wait 7 days before taking Token again';
+                } else if (error.message.includes('No remaining balance')) {
+                    errorMessage = 'Not enough Token left';
+                } else if (error.message.includes('No deposit found')) {
+                    errorMessage = 'No Token found in account';
+                }
+                showAlert(errorMessage, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // 按月提取
+        async function withdrawMonthly() {
+            try {
+                showLoading(true);
+                const tx = await phoenixLocker.withdrawMonthly();
+                await tx.wait();
+                showAlert('Monthly Token taken successfully!', 'success');
+                await updateUI();
+                await updateETHBalance();
+                await updateWalletUSDTBalance();
+            } catch (error) {
+                let errorMessage = 'Failed to take Token';
+                if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    errorMessage = 'Network sync issue, please switch networks in MetaMask or reset account to clear cache';
+                } else if (error.message.includes('missing revert data')) {
+                    errorMessage = 'Contract call failed, please check network connection and contract address';
+                } else if (error.message.includes('Wait 30 days')) {
+                    errorMessage = 'Please wait 30 days before taking Token again';
+                } else if (error.message.includes('No remaining balance')) {
+                    errorMessage = 'Not enough Token left';
+                } else if (error.message.includes('No deposit found')) {
+                    errorMessage = 'No Token found in account';
+                }
+                showAlert(errorMessage, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+
+        
+
+         
+
+         
+        // 更新ETH余额
+        async function updateETHBalance() {
+            try {
+                if (provider && userAddress) {
+                    const balance = await provider.getBalance(userAddress);
+                    const formattedBalance = ethers.utils.formatEther(balance);
+                    const roundedBalance = parseFloat(formattedBalance).toFixed(4);
+                    document.getElementById('eth-balance').textContent = roundedBalance;
+                } else {
+                    document.getElementById('eth-balance').textContent = 'Not Linked';
+                }
+            } catch (error) {
+                console.error('Failed to get ETH balance:', error);
+                document.getElementById('eth-balance').textContent = 'Check Failed';
+                
+                // 处理特定的区块标签错误
+                if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
+                } else if (error.message.includes('missing revert data')) {
+                    showAlert('Contract call failed, please check network connection and contract address', 'error');
+                } else {
+                    showAlert('Failed to check ETH balance: ' + error.message, 'error');
+                }
+            }
+        }
+        
+        // 更新钱包USDT余额
+        async function updateWalletUSDTBalance() {
+            try {
+                if (usdtContract && userAddress) {
+                    // 详细调试信息
+                    console.log('🔍 USDT余额查询调试信息:');
+                    console.log('- 用户地址:', userAddress);
+                    console.log('- USDT合约地址:', MOCK_USDT_ADDRESS);
+                    console.log('- 网络信息:', await provider.getNetwork());
+                    
+                    // 检查合约是否存在
+                    const contractCode = await provider.getCode(MOCK_USDT_ADDRESS);
+                    console.log('- 合约代码长度:', contractCode.length);
+                    console.log('- 合约是否存在:', contractCode !== '0x');
+                    
+                    if (contractCode === '0x') {
+                        throw new Error(`USDT合约未部署在地址 ${MOCK_USDT_ADDRESS}`);
+                    }
+                    
+                    // 检查当前区块号
+                    const blockNumber = await provider.getBlockNumber();
+                    console.log('- 当前区块号:', blockNumber);
+                    
+                    const balance = await usdtContract.balanceOf(userAddress);
+                    const formattedBalance = ethers.utils.formatUnits(balance, 6);
+                    const roundedBalance = parseFloat(formattedBalance).toFixed(2);
+                    document.getElementById('wallet-usdt-balance').textContent = roundedBalance;
+                    
+                    console.log('✅ USDT余额查询成功:', roundedBalance);
+                } else {
+                    document.getElementById('wallet-usdt-balance').textContent = 'Not Linked';
+                    console.log('⚠️ 钱包未连接或合约未初始化');
+                }
+            } catch (error) {
+                console.error('❌ USDT余额查询失败 - 详细错误信息:');
+                console.error('- 错误类型:', error.constructor.name);
+                console.error('- 错误代码:', error.code);
+                console.error('- 错误原因:', error.reason);
+                console.error('- 错误消息:', error.message);
+                console.error('- 完整错误对象:', error);
+                
+                if (error.data) {
+                    console.error('- 错误数据:', error.data);
+                }
+                if (error.transaction) {
+                    console.error('- 交易信息:', error.transaction);
+                }
+                
+                document.getElementById('wallet-usdt-balance').textContent = 'Check Failed';
+                
+                // 详细错误处理
+                let errorMessage = 'USDT余额查询失败';
+                if (error.code === 'CALL_EXCEPTION') {
+                    errorMessage += ' - 合约调用异常';
+                    if (error.reason) {
+                        errorMessage += `: ${error.reason}`;
+                    }
+                    if (error.method) {
+                        errorMessage += ` (方法: ${error.method})`;
+                    }
+                    errorMessage += ` (合约地址: ${MOCK_USDT_ADDRESS})`;
+                } else if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    errorMessage = '网络同步问题，请在MetaMask中切换网络或重置账户清除缓存';
+                } else if (error.message.includes('missing revert data')) {
+                    errorMessage = '合约调用失败，请检查网络连接和合约地址';
+                } else {
+                    errorMessage += `: ${error.message}`;
+                }
+                
+                showAlert(errorMessage, 'error');
+            }
+        }
+        
+        // 计算时间期限
+        function calculateTimeLimits(totalDepositAmount) {
+            // 假设每1000 USDT可以提取78周，每5000 USDT可以提取18个月
+            // 这里使用简化的计算逻辑，实际应该根据合约逻辑调整
+            const depositInUSDT = parseFloat(ethers.utils.formatUnits(totalDepositAmount || 0, 6));
+            
+            let weeksLeft = Math.floor((depositInUSDT / 1000) * 78);
+            let monthsLeft = Math.floor((depositInUSDT / 5000) * 18);
+            
+            // 设置最小和最大值
+            weeksLeft = Math.max(0, Math.min(weeksLeft, 78));
+            monthsLeft = Math.max(0, Math.min(monthsLeft, 18));
+            
+            return { weeksLeft, monthsLeft };
+        }
+        
+        // 更新UI
+        async function updateUI() {
+            try {
+                const [totalDeposit, remainingAmount, withdrawnAmount] = await phoenixLocker.getUserBalance(userAddress);
+                document.getElementById('user-balance').textContent = parseFloat(ethers.utils.formatUnits(remainingAmount, 6)).toFixed(2);
+                
+                const [dailyWithdrawable, weeklyWithdrawable, monthlyWithdrawable] = await phoenixLocker.getUserWithdrawableAmounts(userAddress);
+                document.getElementById('weekly-withdrawable').textContent = parseFloat(ethers.utils.formatUnits(weeklyWithdrawable, 6)).toFixed(2);
+                document.getElementById('monthly-withdrawable').textContent = parseFloat(ethers.utils.formatUnits(monthlyWithdrawable, 6)).toFixed(2);
+                
+                // 更新时间期限
+                const { weeksLeft, monthsLeft } = calculateTimeLimits(totalDeposit);
+                document.getElementById('weekly-time-limit').textContent = `${weeksLeft} weeks left`;
+                document.getElementById('monthly-time-limit').textContent = `${monthsLeft} months left`;
+                
+                await updateETHBalance();
+                await updateWalletUSDTBalance();
+            } catch (error) {
+                console.error('Failed to update UI:', error);
+                
+                // 处理特定的区块标签错误
+                if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
+                    showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
+                } else if (error.message.includes('missing revert data')) {
+                    showAlert('Contract call failed, please check network connection and contract address', 'error');
+                } else {
+                    showAlert('Failed to update UI: ' + error.message, 'error');
+                }
+            }
+        }
+        
+
+        
+        // 显示提示信息
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            
+            let bgColor, textColor, borderColor, icon;
+            switch(type) {
+                case 'success':
+                    bgColor = 'bg-green-900/50';
+                    textColor = 'text-green-200';
+                    borderColor = 'border-green-700';
+                    icon = 'fa-check-circle';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-900/50';
+                    textColor = 'text-red-200';
+                    borderColor = 'border-red-700';
+                    icon = 'fa-exclamation-circle';
+                    break;
+                case 'info':
+                    bgColor = 'bg-blue-900/50';
+                    textColor = 'text-blue-200';
+                    borderColor = 'border-blue-700';
+                    icon = 'fa-info-circle';
+                    break;
+                default:
+                    bgColor = 'bg-gray-900/50';
+                    textColor = 'text-gray-200';
+                    borderColor = 'border-gray-700';
+                    icon = 'fa-info-circle';
+            }
+            
+            alert.className = `${bgColor} border ${borderColor} ${textColor} px-6 py-4 rounded-xl mb-4 flex items-center space-x-3`;
+            alert.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span>${message}</span>
+            `;
+            
+            alertsContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+        
+        // 显示/隐藏加载状态
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+        
+        // 页面加载时检查钱包连接
+        window.addEventListener('load', async () => {
+            await updateETHBalance();
+            
+            if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
+                await connectWallet();
+            }
+        });
+        
+        // 监听账户变化
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    location.reload();
+                } else {
+                    connectWallet();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
