@@ -15,7 +15,7 @@ async function main() {
     console.log(`Deployer ETH balance: ${ethers.formatEther(balance)} ETH\n`);
     
     // Use the specified Sepolia USDT address
-    const sepoliaUSDTAddress = "0xf875fecff122927e53c3b07f4258c690b026004b";
+    const sepoliaUSDTAddress = "0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0"; // Valid Sepolia USDT
     console.log(`Using Sepolia USDT: ${sepoliaUSDTAddress}\n`);
     
     // Deploy PhoenixLocker contract
