@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PhoenixLocker Protocol | Easy Token Manager</title>
+    <title>PhoenixLocker Protocol | You Token Found Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -200,11 +200,11 @@
     </div>
 
     <script>
-        // 合约地址和ABI
+        // Contract addresses and ABI
         const PHOENIX_LOCKER_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0';
         const MOCK_USDT_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
         
-        // 简化的ABI
+        // Simplified ABI
         const PHOENIX_LOCKER_ABI = [
             'function deposit(uint256 amount) external',
             'function withdrawDaily() external',
@@ -229,7 +229,7 @@
         
         let provider, signer, phoenixLocker, usdtContract, userAddress;
         
-        // 连接钱包
+        // Connect wallet
         async function connectWallet() {
             try {
                 if (typeof window.ethereum !== 'undefined') {
@@ -260,7 +260,7 @@
             }
         }
         
-        // 断开钱包连接
+        // Disconnect wallet
         function disconnectWallet() {
             userAddress = null;
             provider = null;
@@ -287,7 +287,7 @@
             showAlert('Wallet disconnected successfully', 'success');
         }
         
-        // 存款
+        // Deposit
         async function deposit() {
             try {
                 const amount = document.getElementById('deposit-amount').value;
@@ -300,7 +300,7 @@
                 
                 const amountWei = ethers.utils.parseUnits(amount, 6);
                 
-                // 检查授权
+                // Check authorization
                 const allowance = await usdtContract.allowance(userAddress, PHOENIX_LOCKER_ADDRESS);
                 if (allowance.lt(amountWei)) {
                     showAlert('Getting permission to use your USDT...', 'info');
@@ -318,7 +318,7 @@
                 await updateETHBalance();
                 await updateWalletUSDTBalance();
             } catch (error) {
-                // 处理特定的区块标签错误
+                // Handle specific block tag errors
                 if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
                     showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
                 } else if (error.message.includes('missing revert data')) {
@@ -335,7 +335,7 @@
             }
         }
         
-        // 按周提取
+        // Weekly withdrawal
         async function withdrawWeekly() {
             try {
                 showLoading(true);
@@ -364,7 +364,7 @@
             }
         }
         
-        // 按月提取
+        // Monthly withdrawal
         async function withdrawMonthly() {
             try {
                 showLoading(true);
@@ -399,7 +399,7 @@
          
 
          
-        // 更新ETH余额
+        // Update ETH balance
         async function updateETHBalance() {
             try {
                 if (provider && userAddress) {
@@ -414,7 +414,7 @@
                 console.error('Failed to get ETH balance:', error);
                 document.getElementById('eth-balance').textContent = 'Check Failed';
                 
-                // 处理特定的区块标签错误
+                // Handle specific block tag errors
                 if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
                     showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
                 } else if (error.message.includes('missing revert data')) {
@@ -425,71 +425,71 @@
             }
         }
         
-        // 更新钱包USDT余额
+        // Update wallet USDT balance
         async function updateWalletUSDTBalance() {
             try {
                 if (usdtContract && userAddress) {
-                    // 详细调试信息
-                    console.log('🔍 USDT余额查询调试信息:');
-                    console.log('- 用户地址:', userAddress);
-                    console.log('- USDT合约地址:', MOCK_USDT_ADDRESS);
-                    console.log('- 网络信息:', await provider.getNetwork());
+                    // Detailed debug information
+                    console.log('🔍 USDT Balance Query Debug Info:');
+                    console.log('- User Address:', userAddress);
+                    console.log('- USDT Contract Address:', MOCK_USDT_ADDRESS);
+                    console.log('- Network Info:', await provider.getNetwork());
                     
-                    // 检查合约是否存在
+                    // Check if contract exists
                     const contractCode = await provider.getCode(MOCK_USDT_ADDRESS);
-                    console.log('- 合约代码长度:', contractCode.length);
-                    console.log('- 合约是否存在:', contractCode !== '0x');
+                    console.log('- Contract Code Length:', contractCode.length);
+                    console.log('- Contract Exists:', contractCode !== '0x');
                     
                     if (contractCode === '0x') {
-                        throw new Error(`USDT合约未部署在地址 ${MOCK_USDT_ADDRESS}`);
+                        throw new Error(`USDT contract not deployed at address ${MOCK_USDT_ADDRESS}`);
                     }
                     
-                    // 检查当前区块号
+                    // Check current block number
                     const blockNumber = await provider.getBlockNumber();
-                    console.log('- 当前区块号:', blockNumber);
+                    console.log('- Current Block Number:', blockNumber);
                     
                     const balance = await usdtContract.balanceOf(userAddress);
                     const formattedBalance = ethers.utils.formatUnits(balance, 6);
                     const roundedBalance = parseFloat(formattedBalance).toFixed(2);
                     document.getElementById('wallet-usdt-balance').textContent = roundedBalance;
                     
-                    console.log('✅ USDT余额查询成功:', roundedBalance);
+                    console.log('✅ USDT Balance Query Successful:', roundedBalance);
                 } else {
                     document.getElementById('wallet-usdt-balance').textContent = 'Not Linked';
-                    console.log('⚠️ 钱包未连接或合约未初始化');
+                    console.log('⚠️ Wallet not connected or contract not initialized');
                 }
             } catch (error) {
-                console.error('❌ USDT余额查询失败 - 详细错误信息:');
-                console.error('- 错误类型:', error.constructor.name);
-                console.error('- 错误代码:', error.code);
-                console.error('- 错误原因:', error.reason);
-                console.error('- 错误消息:', error.message);
-                console.error('- 完整错误对象:', error);
+                console.error('❌ USDT Balance Query Failed - Detailed Error Info:');
+                console.error('- Error Type:', error.constructor.name);
+                console.error('- Error Code:', error.code);
+                console.error('- Error Reason:', error.reason);
+                console.error('- Error Message:', error.message);
+                console.error('- Complete Error Object:', error);
                 
                 if (error.data) {
-                    console.error('- 错误数据:', error.data);
+                    console.error('- Error Data:', error.data);
                 }
                 if (error.transaction) {
-                    console.error('- 交易信息:', error.transaction);
+                    console.error('- Transaction Info:', error.transaction);
                 }
                 
                 document.getElementById('wallet-usdt-balance').textContent = 'Check Failed';
                 
-                // 详细错误处理
-                let errorMessage = 'USDT余额查询失败';
+                // Detailed error handling
+                let errorMessage = 'USDT balance query failed';
                 if (error.code === 'CALL_EXCEPTION') {
-                    errorMessage += ' - 合约调用异常';
+                    errorMessage += ' - Contract call exception';
                     if (error.reason) {
                         errorMessage += `: ${error.reason}`;
                     }
                     if (error.method) {
-                        errorMessage += ` (方法: ${error.method})`;
+                        errorMessage += ` (Method: ${error.method})`;
                     }
-                    errorMessage += ` (合约地址: ${MOCK_USDT_ADDRESS})`;
+                    errorMessage += ` (Contract Address: ${MOCK_USDT_ADDRESS})`;
                 } else if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
-                    errorMessage = '网络同步问题，请在MetaMask中切换网络或重置账户清除缓存';
+                    errorMessage = 'Network sync issue, please switch networks in MetaMask or reset account to clear cache';
                 } else if (error.message.includes('missing revert data')) {
-                    errorMessage = '合约调用失败，请检查网络连接和合约地址';
+                    errorMessage = 'Contract call failed, please check network connection and contract address';
                 } else {
                     errorMessage += `: ${error.message}`;
                 }
@@ -498,23 +498,23 @@
             }
         }
         
-        // 计算时间期限
+        // Calculate time limits
         function calculateTimeLimits(totalDepositAmount) {
-            // 假设每1000 USDT可以提取78周，每5000 USDT可以提取18个月
-            // 这里使用简化的计算逻辑，实际应该根据合约逻辑调整
+            // Assume 1000 USDT can be withdrawn for 78 weeks, 5000 USDT for 18 months
+            // This uses simplified calculation logic, should be adjusted according to contract logic
             const depositInUSDT = parseFloat(ethers.utils.formatUnits(totalDepositAmount || 0, 6));
             
             let weeksLeft = Math.floor((depositInUSDT / 1000) * 78);
             let monthsLeft = Math.floor((depositInUSDT / 5000) * 18);
             
-            // 设置最小和最大值
+            // Set minimum and maximum values
             weeksLeft = Math.max(0, Math.min(weeksLeft, 78));
             monthsLeft = Math.max(0, Math.min(monthsLeft, 18));
             
             return { weeksLeft, monthsLeft };
         }
         
-        // 更新UI
+        // Update UI
         async function updateUI() {
             try {
                 const [totalDeposit, remainingAmount, withdrawnAmount] = await phoenixLocker.getUserBalance(userAddress);
@@ -524,7 +524,7 @@
                 document.getElementById('weekly-withdrawable').textContent = parseFloat(ethers.utils.formatUnits(weeklyWithdrawable, 6)).toFixed(2);
                 document.getElementById('monthly-withdrawable').textContent = parseFloat(ethers.utils.formatUnits(monthlyWithdrawable, 6)).toFixed(2);
                 
-                // 更新时间期限
+                // Update time limits
                 const { weeksLeft, monthsLeft } = calculateTimeLimits(totalDeposit);
                 document.getElementById('weekly-time-limit').textContent = `${weeksLeft} weeks left`;
                 document.getElementById('monthly-time-limit').textContent = `${monthsLeft} months left`;
@@ -534,7 +534,7 @@
             } catch (error) {
                 console.error('Failed to update UI:', error);
                 
-                // 处理特定的区块标签错误
+                // Handle specific block tag errors
                 if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
                     showAlert('Network sync issue, please switch networks in MetaMask or reset account to clear cache', 'error');
                 } else if (error.message.includes('missing revert data')) {
@@ -547,7 +547,7 @@
         
 
         
-        // 显示提示信息
+        // Show alert messages
         function showAlert(message, type) {
             const alertsContainer = document.getElementById('alerts');
             const alert = document.createElement('div');
@@ -592,12 +592,12 @@
             }, 5000);
         }
         
-        // 显示/隐藏加载状态
+        // Show/hide loading state
         function showLoading(show) {
             document.getElementById('loading').classList.toggle('hidden', !show);
         }
         
-        // 页面加载时检查钱包连接
+        // Check wallet connection on page load
         window.addEventListener('load', async () => {
             await updateETHBalance();
             
@@ -606,7 +606,7 @@
             }
         });
         
-        // 监听账户变化
+        // Listen for account changes
         if (typeof window.ethereum !== 'undefined') {
             window.ethereum.on('accountsChanged', (accounts) => {
                 if (accounts.length === 0) {

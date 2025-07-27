@@ -18,7 +18,7 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545"
     },
-    // 可以添加其他网络配置
+    // Can add other network configurations
     // mainnet: {
     //   url: "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
     //   accounts: ["YOUR_PRIVATE_KEY"]

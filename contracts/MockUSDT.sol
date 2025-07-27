@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title MockUSDT
- * @dev 模拟USDT代币合约，用于测试PhoenixLocker Protocol
+ * @dev Mock USDT token contract for testing PhoenixLocker Protocol
  */
 contract MockUSDT is ERC20 {
     constructor(uint256 initialSupply) ERC20("Mock USDT", "USDT") {
@@ -13,14 +13,14 @@ contract MockUSDT is ERC20 {
     }
     
     /**
-     * @dev 重写decimals函数，USDT使用6位小数
+     * @dev Override decimals function, USDT uses 6 decimal places
      */
     function decimals() public view virtual override returns (uint8) {
         return 6;
     }
     
     /**
-     * @dev 铸造新代币（仅用于测试）
+     * @dev Mint new tokens (for testing only)
      */
     function mint(address to, uint256 amount) external {
         _mint(to, amount);

@@ -1,147 +1,147 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("开始测试 PhoenixLocker Protocol 功能...");
+  console.log("Starting PhoenixLocker Protocol functionality test...");
   
-  // 获取测试账户
+  // Get test accounts
   const [owner, user1, user2] = await hre.ethers.getSigners();
-  console.log("\n测试账户:");
+  console.log("\nTest accounts:");
   console.log("Owner:", owner.address);
   console.log("User1:", user1.address);
   console.log("User2:", user2.address);
   
-  // 部署MockUSDT合约用于测试
-  console.log("\n=== 部署MockUSDT合约 ===");
+  // Deploy MockUSDT contract for testing
+  console.log("\n=== Deploy MockUSDT Contract ===");
   const MockUSDT = await hre.ethers.getContractFactory("MockUSDT");
   const initialSupply = hre.ethers.parseUnits("1000000", 6); // 1M USDT
   const mockUSDT = await MockUSDT.deploy(initialSupply);
   await mockUSDT.waitForDeployment();
   const usdtAddress = await mockUSDT.getAddress();
-  console.log("MockUSDT 部署地址:", usdtAddress);
+  console.log("MockUSDT deployment address:", usdtAddress);
   
-  // 部署PhoenixLocker合约
-  console.log("\n=== 部署PhoenixLocker合约 ===");
+  // Deploy PhoenixLocker contract
+  console.log("\n=== Deploy PhoenixLocker Contract ===");
   const PhoenixLocker = await hre.ethers.getContractFactory("PhoenixLocker");
   const phoenixLocker = await PhoenixLocker.deploy(usdtAddress);
   await phoenixLocker.waitForDeployment();
   const lockerAddress = await phoenixLocker.getAddress();
-  console.log("PhoenixLocker 部署地址:", lockerAddress);
+  console.log("PhoenixLocker deployment address:", lockerAddress);
   
-  // 给测试用户分配USDT
-  console.log("\n=== 分配测试USDT ===");
+  // Allocate USDT to test users
+  console.log("\n=== Allocate Test USDT ===");
   const testAmount = hre.ethers.parseUnits("10000", 6); // 10,000 USDT
   await mockUSDT.transfer(user1.address, testAmount);
   await mockUSDT.transfer(user2.address, testAmount);
   
-  console.log("User1 USDT余额:", hre.ethers.formatUnits(await mockUSDT.balanceOf(user1.address), 6));
-  console.log("User2 USDT余额:", hre.ethers.formatUnits(await mockUSDT.balanceOf(user2.address), 6));
+  console.log("User1 USDT balance:", hre.ethers.formatUnits(await mockUSDT.balanceOf(user1.address), 6));
+  console.log("User2 USDT balance:", hre.ethers.formatUnits(await mockUSDT.balanceOf(user2.address), 6));
   
-  // 测试存款功能
-  console.log("\n=== 测试存款功能 ===");
+  // Test deposit functionality
+  console.log("\n=== Test Deposit Functionality ===");
   const depositAmount = hre.ethers.parseUnits("1000", 6); // 1,000 USDT
   
-  // User1 存款
+  // User1 deposit
   await mockUSDT.connect(user1).approve(lockerAddress, depositAmount);
   await phoenixLocker.connect(user1).deposit(depositAmount);
-  console.log("User1 存款成功:", hre.ethers.formatUnits(depositAmount, 6), "USDT");
+  console.log("User1 deposit successful:", hre.ethers.formatUnits(depositAmount, 6), "USDT");
   
-  // User2 存款
+  // User2 deposit
   await mockUSDT.connect(user2).approve(lockerAddress, depositAmount);
   await phoenixLocker.connect(user2).deposit(depositAmount);
-  console.log("User2 存款成功:", hre.ethers.formatUnits(depositAmount, 6), "USDT");
+  console.log("User2 deposit successful:", hre.ethers.formatUnits(depositAmount, 6), "USDT");
   
-  // 查询合约总余额
+  // Query contract total balance
   const totalBalance = await phoenixLocker.getTotalContractBalance();
-  console.log("合约总余额:", hre.ethers.formatUnits(totalBalance, 6), "USDT");
+  console.log("Contract total balance:", hre.ethers.formatUnits(totalBalance, 6), "USDT");
   
-  // 查询用户余额
-  console.log("\n=== 查询用户余额 ===");
+  // Query user balance
+  console.log("\n=== Query User Balance ===");
   const [user1Total, user1Remaining, user1Withdrawn] = await phoenixLocker.getUserBalance(user1.address);
-  console.log("User1 - 总存款:", hre.ethers.formatUnits(user1Total, 6), "USDT");
-  console.log("User1 - 剩余:", hre.ethers.formatUnits(user1Remaining, 6), "USDT");
-  console.log("User1 - 已提取:", hre.ethers.formatUnits(user1Withdrawn, 6), "USDT");
+  console.log("User1 - Total deposit:", hre.ethers.formatUnits(user1Total, 6), "USDT");
+  console.log("User1 - Remaining:", hre.ethers.formatUnits(user1Remaining, 6), "USDT");
+  console.log("User1 - Withdrawn:", hre.ethers.formatUnits(user1Withdrawn, 6), "USDT");
   
-  // 查询每日/每月可提取金额
+  // Query daily/monthly withdrawable amounts
   const [dailyWithdrawable, monthlyWithdrawable] = await phoenixLocker.getUserWithdrawableAmounts(user1.address);
-  console.log("User1 - 每日可提取:", hre.ethers.formatUnits(dailyWithdrawable, 6), "USDT");
-  console.log("User1 - 每月可提取:", hre.ethers.formatUnits(monthlyWithdrawable, 6), "USDT");
+  console.log("User1 - Daily withdrawable:", hre.ethers.formatUnits(dailyWithdrawable, 6), "USDT");
+  console.log("User1 - Monthly withdrawable:", hre.ethers.formatUnits(monthlyWithdrawable, 6), "USDT");
   
-  // 查询所有用户
-  console.log("\n=== 查询所有用户 ===");
+  // Query all users
+  console.log("\n=== Query All Users ===");
   const allUsers = await phoenixLocker.getAllDepositUsers();
-  console.log("有资金的用户数量:", allUsers.length);
-  console.log("用户列表:", allUsers);
+  console.log("Number of users with funds:", allUsers.length);
+  console.log("User list:", allUsers);
   
-  // 模拟时间推进并测试提取功能
-  console.log("\n=== 测试提取功能 ===");
+  // Simulate time progression and test withdrawal functionality
+  console.log("\n=== Test Withdrawal Functionality ===");
   
-  // 增加时间1天
-  await hre.network.provider.send("evm_increaseTime", [86400]); // 1天
+  // Increase time by 1 day
+  await hre.network.provider.send("evm_increaseTime", [86400]); // 1 day
   await hre.network.provider.send("evm_mine");
   
-  // 查询当前可提取金额
+  // Query current withdrawable amount
   const availableDaily = await phoenixLocker.getAvailableDailyWithdraw(user1.address);
-  console.log("User1 当前可按天提取:", hre.ethers.formatUnits(availableDaily, 6), "USDT");
+  console.log("User1 current daily withdrawable:", hre.ethers.formatUnits(availableDaily, 6), "USDT");
   
-  // 按天提取
+  // Daily withdrawal
   if (availableDaily > 0) {
     const balanceBefore = await mockUSDT.balanceOf(user1.address);
     await phoenixLocker.connect(user1).withdrawDaily();
     const balanceAfter = await mockUSDT.balanceOf(user1.address);
     const withdrawn = balanceAfter - balanceBefore;
-    console.log("User1 按天提取成功:", hre.ethers.formatUnits(withdrawn, 6), "USDT");
+    console.log("User1 daily withdrawal successful:", hre.ethers.formatUnits(withdrawn, 6), "USDT");
   }
   
-  // 增加时间1个月
-  await hre.network.provider.send("evm_increaseTime", [30 * 86400]); // 30天
+  // Increase time by 1 month
+  await hre.network.provider.send("evm_increaseTime", [30 * 86400]); // 30 days
   await hre.network.provider.send("evm_mine");
   
   // 查询当前可提取金额
   const availableMonthly = await phoenixLocker.getAvailableMonthlyWithdraw(user2.address);
-  console.log("User2 当前可按月提取:", hre.ethers.formatUnits(availableMonthly, 6), "USDT");
+  console.log("User2 current monthly withdrawable:", hre.ethers.formatUnits(availableMonthly, 6), "USDT");
   
-  // 按月提取
+  // Monthly withdrawal
   if (availableMonthly > 0) {
     const balanceBefore = await mockUSDT.balanceOf(user2.address);
     await phoenixLocker.connect(user2).withdrawMonthly();
     const balanceAfter = await mockUSDT.balanceOf(user2.address);
     const withdrawn = balanceAfter - balanceBefore;
-    console.log("User2 按月提取成功:", hre.ethers.formatUnits(withdrawn, 6), "USDT");
+    console.log("User2 monthly withdrawal successful:", hre.ethers.formatUnits(withdrawn, 6), "USDT");
   }
   
-  // 查询交易记录
-  console.log("\n=== 查询交易记录 ===");
+  // Query transaction records
+  console.log("\n=== Query Transaction Records ===");
   const user1Transactions = await phoenixLocker.getUserTransactions(user1.address);
-  console.log("User1 交易记录数量:", user1Transactions.length);
+  console.log("User1 transaction record count:", user1Transactions.length);
   
   for (let i = 0; i < user1Transactions.length; i++) {
     const tx = user1Transactions[i];
-    console.log(`交易 ${i + 1}:`, {
-      类型: tx.isDeposit ? "存款" : "提款",
-      金额: hre.ethers.formatUnits(tx.amount, 6) + " USDT",
-      时间: new Date(Number(tx.timestamp) * 1000).toLocaleString()
+    console.log(`Transaction ${i + 1}:`, {
+      Type: tx.isDeposit ? "Deposit" : "Withdrawal",
+      Amount: hre.ethers.formatUnits(tx.amount, 6) + " USDT",
+      Time: new Date(Number(tx.timestamp) * 1000).toLocaleString()
     });
   }
   
-  // 最终状态查询
-  console.log("\n=== 最终状态 ===");
+  // Final status query
+  console.log("\n=== Final Status ===");
   const finalTotalBalance = await phoenixLocker.getTotalContractBalance();
-  console.log("合约最终余额:", hre.ethers.formatUnits(finalTotalBalance, 6), "USDT");
+  console.log("Contract final balance:", hre.ethers.formatUnits(finalTotalBalance, 6), "USDT");
   
   const [user1FinalTotal, user1FinalRemaining, user1FinalWithdrawn] = await phoenixLocker.getUserBalance(user1.address);
-  console.log("User1 最终状态:");
-  console.log("  - 总存款:", hre.ethers.formatUnits(user1FinalTotal, 6), "USDT");
-  console.log("  - 剩余:", hre.ethers.formatUnits(user1FinalRemaining, 6), "USDT");
-  console.log("  - 已提取:", hre.ethers.formatUnits(user1FinalWithdrawn, 6), "USDT");
+  console.log("User1 final status:");
+  console.log("  - Total deposit:", hre.ethers.formatUnits(user1FinalTotal, 6), "USDT");
+  console.log("  - Remaining:", hre.ethers.formatUnits(user1FinalRemaining, 6), "USDT");
+  console.log("  - Withdrawn:", hre.ethers.formatUnits(user1FinalWithdrawn, 6), "USDT");
   
   const [user2FinalTotal, user2FinalRemaining, user2FinalWithdrawn] = await phoenixLocker.getUserBalance(user2.address);
-  console.log("User2 最终状态:");
-  console.log("  - 总存款:", hre.ethers.formatUnits(user2FinalTotal, 6), "USDT");
-  console.log("  - 剩余:", hre.ethers.formatUnits(user2FinalRemaining, 6), "USDT");
-  console.log("  - 已提取:", hre.ethers.formatUnits(user2FinalWithdrawn, 6), "USDT");
+  console.log("User2 final status:");
+  console.log("  - Total deposit:", hre.ethers.formatUnits(user2FinalTotal, 6), "USDT");
+  console.log("  - Remaining:", hre.ethers.formatUnits(user2FinalRemaining, 6), "USDT");
+  console.log("  - Withdrawn:", hre.ethers.formatUnits(user2FinalWithdrawn, 6), "USDT");
   
-  console.log("\n🎉 PhoenixLocker Protocol 功能测试完成!");
-  console.log("\n合约地址信息:");
+  console.log("\n🎉 PhoenixLocker Protocol functionality test completed!");
+  console.log("\nContract address information:");
   console.log("MockUSDT:", usdtAddress);
   console.log("PhoenixLocker:", lockerAddress);
 }
@@ -149,6 +149,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("测试失败:", error);
+    console.error("Test failed:", error);
     process.exit(1);
   });

@@ -2,28 +2,28 @@ const hre = require("hardhat");
 const { ethers } = hre;
 
 async function main() {
-    console.log("开始为账号1添加10000 USDT...");
+    console.log("Starting to add 10000 USDT to account 1...");
     
-    // 获取账户
+    // Get accounts
     const [deployer, user1] = await ethers.getSigners();
     
-    console.log("部署者地址:", deployer.address);
-    console.log("用户1地址:", user1.address);
+    console.log("Deployer address:", deployer.address);
+    console.log("User 1 address:", user1.address);
     
-    // MockUSDT合约地址（从最新部署中获取）
+    // MockUSDT contract address (from latest deployment)
     const MOCK_USDT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
     
-    // 连接到MockUSDT合约
+    // Connect to MockUSDT contract
     const MockUSDT = await ethers.getContractFactory("MockUSDT");
     const mockUSDT = MockUSDT.attach(MOCK_USDT_ADDRESS);
     
-    // 检查用户1当前USDT余额
+    // Check user 1's current USDT balance
     const currentBalance = await mockUSDT.balanceOf(user1.address);
-    console.log("用户1当前USDT余额:", ethers.formatUnits(currentBalance, 6), "USDT");
+    console.log("User 1's current USDT balance:", ethers.formatUnits(currentBalance, 6), "USDT");
     
-    // 给用户1分配10000 USDT
+    // Allocate 10000 USDT to user 1
     const amountToAdd = ethers.parseUnits("10000", 6);
-    console.log("正在给用户1添加10000 USDT...");
+    console.log("Adding 10000 USDT to user 1...");
     
     const tx = await mockUSDT.transfer(user1.address, amountToAdd);
     await tx.wait();
