@@ -1,47 +1,47 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("开始部署 PhoenixLocker Protocol...");
+  console.log("Starting PhoenixLocker Protocol deployment...");
 
-  // 获取合约工厂
+  // Get contract factory
   const PhoenixLocker = await hre.ethers.getContractFactory("PhoenixLocker");
   
-  // USDT合约地址 (需要根据实际网络修改)
-  // 主网 USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
-  // 测试网可以部署一个模拟的USDT合约
-  const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // 主网USDT地址
+  // USDT contract address (modify according to actual network)
+  // Mainnet USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+  // Testnet can deploy a mock USDT contract
+  const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // Mainnet USDT address
   
-  console.log("使用的USDT合约地址:", USDT_ADDRESS);
+  console.log("Using USDT contract address:", USDT_ADDRESS);
   
-  // 部署合约
+  // Deploy contract
   const phoenixLocker = await PhoenixLocker.deploy(USDT_ADDRESS);
   
   await phoenixLocker.waitForDeployment();
   
   const contractAddress = await phoenixLocker.getAddress();
   
-  console.log("PhoenixLocker Protocol 部署成功!");
-  console.log("合约地址:", contractAddress);
-  console.log("USDT代币地址:", USDT_ADDRESS);
+  console.log("PhoenixLocker Protocol deployed successfully!");
+  console.log("Contract address:", contractAddress);
+  console.log("USDT token address:", USDT_ADDRESS);
   
-  // 验证部署
-  console.log("\n验证合约部署...");
+  // Verify deployment
+  console.log("\nVerifying contract deployment...");
   const totalBalance = await phoenixLocker.getTotalContractBalance();
-  console.log("合约初始余额:", totalBalance.toString());
+  console.log("Contract initial balance:", totalBalance.toString());
   
-  console.log("\n部署完成! 可以开始使用 PhoenixLocker Protocol");
-  console.log("\n主要功能:");
-  console.log("1. deposit(amount) - 存入USDT");
-  console.log("2. withdrawDaily() - 按天提取资金");
-  console.log("3. withdrawMonthly() - 按月提取资金");
-  console.log("4. getUserBalance(address) - 查询用户余额");
-  console.log("5. getTotalContractBalance() - 查询合约总余额");
+  console.log("\nDeployment complete! You can start using PhoenixLocker Protocol");
+  console.log("\nMain functions:");
+  console.log("1. deposit(amount) - Deposit USDT");
+  console.log("2. withdrawDaily() - Withdraw funds daily");
+  console.log("3. withdrawMonthly() - Withdraw funds monthly");
+  console.log("4. getUserBalance(address) - Query user balance");
+  console.log("5. getTotalContractBalance() - Query contract total balance");
 }
 
-// 错误处理
+// Error handling
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("部署失败:", error);
+    console.error("Deployment failed:", error);
     process.exit(1);
   });

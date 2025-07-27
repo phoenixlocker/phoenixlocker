@@ -7,48 +7,48 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PhoenixLocker Protocol
- * @dev 基于比尔·盖茨"微软离破产永远只有18个月"理念的资金锁定智能合约
- * @notice 允许用户存入USDT并按18个月周期分期提取资金
+ * @dev Fund locking smart contract based on Bill Gates' "Microsoft is always 18 months away from bankruptcy" philosophy
+ * @notice Allows users to deposit USDT and withdraw funds in installments over an 18-month cycle
  */
 contract PhoenixLocker is ReentrancyGuard, Ownable {
     IERC20 public immutable usdt;
     
-    // 常量定义
+    // Constant definitions
     uint256 public constant LOCK_PERIOD_MONTHS = 18;
     uint256 public constant DAYS_PER_MONTH = 30;
     uint256 public constant DAYS_PER_WEEK = 7;
-    uint256 public constant TOTAL_DAYS = LOCK_PERIOD_MONTHS * DAYS_PER_MONTH; // 540天
-    uint256 public constant TOTAL_WEEKS = TOTAL_DAYS / DAYS_PER_WEEK; // 约77周
+    uint256 public constant TOTAL_DAYS = LOCK_PERIOD_MONTHS * DAYS_PER_MONTH; // 540 days
+    uint256 public constant TOTAL_WEEKS = TOTAL_DAYS / DAYS_PER_WEEK; // approximately 77 weeks
     uint256 public constant SECONDS_PER_DAY = 86400;
     
-    // 用户存款信息结构体
+    // User deposit information struct
     struct UserDeposit {
-        uint256 totalAmount;        // 总存款金额
-        uint256 remainingAmount;    // 剩余金额
-        uint256 dailyWithdrawable;  // 每日可提取金额
-        uint256 weeklyWithdrawable; // 每周可提取金额
-        uint256 monthlyWithdrawable; // 每月可提取金额
-        uint256 depositTime;       // 存款时间
-        uint256 lastWithdrawTime;  // 最后提取时间
-        uint256 withdrawnAmount;   // 已提取金额
+        uint256 totalAmount;        // Total deposit amount
+        uint256 remainingAmount;    // Remaining amount
+        uint256 dailyWithdrawable;  // Daily withdrawable amount
+        uint256 weeklyWithdrawable; // Weekly withdrawable amount
+        uint256 monthlyWithdrawable; // Monthly withdrawable amount
+        uint256 depositTime;       // Deposit time
+        uint256 lastWithdrawTime;  // Last withdrawal time
+        uint256 withdrawnAmount;   // Withdrawn amount
     }
     
-    // 交易记录结构体
+    // Transaction record struct
     struct Transaction {
         address user;
         uint256 amount;
         uint256 timestamp;
-        bool isDeposit; // true为存款，false为提款
+        bool isDeposit; // true for deposit, false for withdrawal
     }
     
-    // 状态变量
+    // State variables
     mapping(address => UserDeposit) public userDeposits;
     mapping(address => Transaction[]) public userTransactions;
     address[] public depositUsers;
     Transaction[] public allTransactions;
     uint256 public totalContractBalance;
     
-    // 事件定义
+    // Event definitions
     event Deposit(address indexed user, uint256 amount, uint256 timestamp);
     event Withdraw(address indexed user, uint256 amount, uint256 timestamp, bool isDaily);
     event EmergencyWithdraw(address indexed user, uint256 amount, uint256 timestamp);
@@ -58,8 +58,8 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 存款函数 - 用户转账USDT到智能合约
-     * @param amount 存款金额
+     * @dev Deposit function - User transfers USDT to smart contract
+     * @param amount Deposit amount
      */
     function deposit(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
@@ -67,27 +67,27 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
         
         UserDeposit storage userDeposit = userDeposits[msg.sender];
         
-        // 如果是新用户，添加到用户列表
+        // If new user, add to user list
         if (userDeposit.totalAmount == 0) {
             depositUsers.push(msg.sender);
         }
         
-        // 更新用户存款信息
+        // Update user deposit information
         userDeposit.totalAmount += amount;
         userDeposit.remainingAmount += amount;
         userDeposit.dailyWithdrawable = userDeposit.totalAmount / TOTAL_DAYS;
         userDeposit.weeklyWithdrawable = userDeposit.totalAmount / TOTAL_WEEKS;
         userDeposit.monthlyWithdrawable = userDeposit.totalAmount / LOCK_PERIOD_MONTHS;
         userDeposit.depositTime = block.timestamp;
-        // 首次存款时设置lastWithdrawTime为0，允许立即提取
+        // Set lastWithdrawTime to 0 for first deposit, allowing immediate withdrawal
         if (userDeposit.lastWithdrawTime == 0) {
             userDeposit.lastWithdrawTime = 0;
         }
         
-        // 更新合约总余额
+        // Update contract total balance
         totalContractBalance += amount;
         
-        // 记录交易
+        // Record transaction
         Transaction memory newTransaction = Transaction({
             user: msg.sender,
             amount: amount,
@@ -102,24 +102,24 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 按天提取资金 - 每天可提取 1/(18*30) 的资金
+     * @dev Withdraw funds daily - Can withdraw 1/(18*30) of funds per day
      */
     function withdrawDaily() external nonReentrant {
         UserDeposit storage userDeposit = userDeposits[msg.sender];
         require(userDeposit.totalAmount > 0, "No deposit found");
         require(userDeposit.remainingAmount > 0, "No remaining balance");
         
-        // 计算可提取的天数
+        // Calculate withdrawable days
         uint256 daysSinceLastWithdraw;
         if (userDeposit.lastWithdrawTime == 0) {
-            // 首次提取，允许立即提取
+            // First withdrawal, allow immediate withdrawal
             daysSinceLastWithdraw = 1;
         } else {
             daysSinceLastWithdraw = (block.timestamp - userDeposit.lastWithdrawTime) / SECONDS_PER_DAY;
             require(daysSinceLastWithdraw >= 1, "Wait 24 hours");
         }
         
-        // 计算提取金额
+        // Calculate withdrawal amount
         uint256 withdrawAmount = userDeposit.dailyWithdrawable * daysSinceLastWithdraw;
         if (withdrawAmount > userDeposit.remainingAmount) {
             withdrawAmount = userDeposit.remainingAmount;
@@ -127,18 +127,18 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
         
         require(withdrawAmount > 0, "No amount to withdraw");
         
-        // 更新用户信息
+        // Update user information
         userDeposit.remainingAmount -= withdrawAmount;
         userDeposit.withdrawnAmount += withdrawAmount;
         userDeposit.lastWithdrawTime = block.timestamp;
         
-        // 更新合约总余额
+        // Update contract total balance
         totalContractBalance -= withdrawAmount;
         
-        // 转账给用户
+        // Transfer to user
         require(usdt.transfer(msg.sender, withdrawAmount), "Transfer failed");
         
-        // 记录交易
+        // Record transaction
         Transaction memory newTransaction = Transaction({
             user: msg.sender,
             amount: withdrawAmount,
@@ -153,24 +153,24 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 按月提取资金 - 每月可提取 1/18 的资金
+     * @dev Withdraw funds monthly - Can withdraw 1/18 of funds per month
      */
     function withdrawMonthly() external nonReentrant {
         UserDeposit storage userDeposit = userDeposits[msg.sender];
         require(userDeposit.totalAmount > 0, "No deposit found");
         require(userDeposit.remainingAmount > 0, "No remaining balance");
         
-        // 计算可提取的月数
+        // Calculate withdrawable months
         uint256 monthsSinceLastWithdraw;
         if (userDeposit.lastWithdrawTime == 0) {
-            // 首次提取，允许立即提取
+            // First withdrawal, allow immediate withdrawal
             monthsSinceLastWithdraw = 1;
         } else {
             monthsSinceLastWithdraw = (block.timestamp - userDeposit.lastWithdrawTime) / (DAYS_PER_MONTH * SECONDS_PER_DAY);
             require(monthsSinceLastWithdraw >= 1, "Wait 30 days");
         }
         
-        // 计算提取金额
+        // Calculate withdrawal amount
         uint256 withdrawAmount = userDeposit.monthlyWithdrawable * monthsSinceLastWithdraw;
         if (withdrawAmount > userDeposit.remainingAmount) {
             withdrawAmount = userDeposit.remainingAmount;
@@ -178,18 +178,18 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
         
         require(withdrawAmount > 0, "No amount to withdraw");
         
-        // 更新用户信息
+        // Update user information
         userDeposit.remainingAmount -= withdrawAmount;
         userDeposit.withdrawnAmount += withdrawAmount;
         userDeposit.lastWithdrawTime = block.timestamp;
         
-        // 更新合约总余额
+        // Update contract total balance
         totalContractBalance -= withdrawAmount;
         
-        // 转账给用户
+        // Transfer to user
         require(usdt.transfer(msg.sender, withdrawAmount), "Transfer failed");
         
-        // 记录交易
+        // Record transaction
         Transaction memory newTransaction = Transaction({
             user: msg.sender,
             amount: withdrawAmount,
@@ -204,24 +204,24 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 按周提取资金 - 每周可提取 1/77 的资金
+     * @dev Withdraw funds weekly - Can withdraw 1/77 of funds per week
      */
     function withdrawWeekly() external nonReentrant {
         UserDeposit storage userDeposit = userDeposits[msg.sender];
         require(userDeposit.totalAmount > 0, "No deposit found");
         require(userDeposit.remainingAmount > 0, "No remaining balance");
         
-        // 计算可提取的周数
+        // Calculate withdrawable weeks
         uint256 weeksSinceLastWithdraw;
         if (userDeposit.lastWithdrawTime == 0) {
-            // 首次提取，允许立即提取
+            // First withdrawal, allow immediate withdrawal
             weeksSinceLastWithdraw = 1;
         } else {
             weeksSinceLastWithdraw = (block.timestamp - userDeposit.lastWithdrawTime) / (DAYS_PER_WEEK * SECONDS_PER_DAY);
             require(weeksSinceLastWithdraw >= 1, "Wait 7 days");
         }
         
-        // 计算提取金额
+        // Calculate withdrawal amount
         uint256 withdrawAmount = userDeposit.weeklyWithdrawable * weeksSinceLastWithdraw;
         if (withdrawAmount > userDeposit.remainingAmount) {
             withdrawAmount = userDeposit.remainingAmount;
@@ -229,18 +229,18 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
         
         require(withdrawAmount > 0, "No amount to withdraw");
         
-        // 更新用户信息
+        // Update user information
         userDeposit.remainingAmount -= withdrawAmount;
         userDeposit.withdrawnAmount += withdrawAmount;
         userDeposit.lastWithdrawTime = block.timestamp;
         
-        // 更新合约总余额
+        // Update contract total balance
         totalContractBalance -= withdrawAmount;
         
-        // 转账给用户
+        // Transfer to user
         require(usdt.transfer(msg.sender, withdrawAmount), "Transfer failed");
         
-        // 记录交易
+        // Record transaction
         Transaction memory newTransaction = Transaction({
             user: msg.sender,
             amount: withdrawAmount,
@@ -255,7 +255,7 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 紧急提取所有剩余资金（仅限存款人）
+     * @dev Emergency withdrawal of all remaining funds (depositors only)
      */
     function emergencyWithdraw() external nonReentrant {
         UserDeposit storage userDeposit = userDeposits[msg.sender];
@@ -264,17 +264,17 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
         
         uint256 withdrawAmount = userDeposit.remainingAmount;
         
-        // 更新用户信息
+        // Update user information
         userDeposit.remainingAmount = 0;
         userDeposit.withdrawnAmount += withdrawAmount;
         
-        // 更新合约总余额
+        // Update contract total balance
         totalContractBalance -= withdrawAmount;
         
-        // 转账给用户
+        // Transfer to user
         require(usdt.transfer(msg.sender, withdrawAmount), "Transfer failed");
         
-        // 记录交易
+        // Record transaction
         Transaction memory newTransaction = Transaction({
             user: msg.sender,
             amount: withdrawAmount,
@@ -289,11 +289,11 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 查询用户在智能合约中的总资金
-     * @param user 用户地址
-     * @return totalAmount 总存款金额
-     * @return remainingAmount 剩余金额
-     * @return withdrawnAmount 已提取金额
+     * @dev Query user's total funds in smart contract
+     * @param user User address
+     * @return totalAmount Total deposit amount
+     * @return remainingAmount Remaining amount
+     * @return withdrawnAmount Withdrawn amount
      */
     function getUserBalance(address user) external view returns (
         uint256 totalAmount,
@@ -305,11 +305,11 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 查询用户每日/每周/每月可提取金额
-     * @param user 用户地址
-     * @return dailyWithdrawable 每日可提取金额
-     * @return weeklyWithdrawable 每周可提取金额
-     * @return monthlyWithdrawable 每月可提取金额
+     * @dev Query user's daily/weekly/monthly withdrawable amounts
+     * @param user User address
+     * @return dailyWithdrawable Daily withdrawable amount
+     * @return weeklyWithdrawable Weekly withdrawable amount
+     * @return monthlyWithdrawable Monthly withdrawable amount
      */
     function getUserWithdrawableAmounts(address user) external view returns (
         uint256 dailyWithdrawable,
@@ -318,7 +318,7 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     ) {
         UserDeposit memory userDeposit = userDeposits[user];
         
-        // 如果没有剩余余额，返回0
+        // If no remaining balance, return 0
         if (userDeposit.remainingAmount == 0) {
             return (0, 0, 0);
         }
@@ -327,28 +327,28 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 查询整个智能合约的总资金
-     * @return totalBalance 合约总余额
+     * @dev Query total funds of the entire smart contract
+     * @return totalBalance Contract total balance
      */
     function getTotalContractBalance() external view returns (uint256 totalBalance) {
         return totalContractBalance;
     }
     
     /**
-     * @dev 查询所有有资金的账号
-     * @return users 有资金的用户地址数组
+     * @dev Query all accounts with funds
+     * @return users Array of user addresses with funds
      */
     function getAllDepositUsers() external view returns (address[] memory users) {
         uint256 activeUserCount = 0;
         
-        // 计算活跃用户数量
+        // Calculate active user count
         for (uint256 i = 0; i < depositUsers.length; i++) {
             if (userDeposits[depositUsers[i]].remainingAmount > 0) {
                 activeUserCount++;
             }
         }
         
-        // 创建活跃用户数组
+        // Create active users array
         address[] memory activeUsers = new address[](activeUserCount);
         uint256 index = 0;
         
@@ -363,35 +363,35 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 查询用户的存款和取款记录
-     * @param user 用户地址
-     * @return transactions 用户的交易记录数组
+     * @dev Query user's deposit and withdrawal records
+     * @param user User address
+     * @return transactions User's transaction record array
      */
     function getUserTransactions(address user) external view returns (Transaction[] memory transactions) {
         return userTransactions[user];
     }
     
     /**
-     * @dev 查询所有交易记录
-     * @return transactions 所有交易记录数组
+     * @dev Query all transaction records
+     * @return transactions All transaction record array
      */
     function getAllTransactions() external view returns (Transaction[] memory transactions) {
         return allTransactions;
     }
     
     /**
-     * @dev 查询用户详细信息
-     * @param user 用户地址
-     * @return userDeposit 用户存款详细信息
+     * @dev Query user detailed information
+     * @param user User address
+     * @return userDeposit User deposit detailed information
      */
     function getUserDepositInfo(address user) external view returns (UserDeposit memory userDeposit) {
         return userDeposits[user];
     }
     
     /**
-     * @dev 计算用户当前可提取的金额（按天）
-     * @param user 用户地址
-     * @return availableAmount 可提取金额
+     * @dev Calculate user's current withdrawable amount (daily)
+     * @param user User address
+     * @return availableAmount Withdrawable amount
      */
     function getAvailableDailyWithdraw(address user) external view returns (uint256 availableAmount) {
         UserDeposit memory userDeposit = userDeposits[user];
@@ -410,9 +410,9 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 计算用户当前可提取的金额（按周）
-     * @param user 用户地址
-     * @return availableAmount 可提取金额
+     * @dev Calculate user's current withdrawable amount (weekly)
+     * @param user User address
+     * @return availableAmount Withdrawable amount
      */
     function getAvailableWeeklyWithdraw(address user) external view returns (uint256 availableAmount) {
         UserDeposit memory userDeposit = userDeposits[user];
@@ -431,9 +431,9 @@ contract PhoenixLocker is ReentrancyGuard, Ownable {
     }
     
     /**
-     * @dev 计算用户当前可提取的金额（按月）
-     * @param user 用户地址
-     * @return availableAmount 可提取金额
+     * @dev Calculate user's current withdrawable amount (monthly)
+     * @param user User address
+     * @return availableAmount Withdrawable amount
      */
     function getAvailableMonthlyWithdraw(address user) external view returns (uint256 availableAmount) {
         UserDeposit memory userDeposit = userDeposits[user];

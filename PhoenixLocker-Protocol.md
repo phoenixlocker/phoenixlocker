@@ -1,14 +1,14 @@
 PhoenixLocker Protocol
-基于比尔·盖茨"微软离破产永远只有18个月"理念的智能资金管理
+Smart Fund Management Based on Bill Gates' "Microsoft is Always 18 Months Away from Bankruptcy" Philosophy
 
-“微软离破产永远只有18个月”这一说法源自微软创始人比尔·盖茨（Bill Gates）的言论。这句话深刻地反映了在高科技行业中，企业面临的竞争压力和持续创新的必要性。企业需要制定严格的财务制度，保持 18 个月的稳定现金流。请根据这个论断编写 一个简单的 Ethereum 智能合约，这个智能合约的名字叫做 PhoenixLocker Protocol 。
+The statement "Microsoft is always 18 months away from bankruptcy" originates from Microsoft founder Bill Gates. This statement profoundly reflects the competitive pressure and necessity for continuous innovation that companies face in the high-tech industry. Companies need to establish strict financial systems and maintain stable cash flow for 18 months. Based on this principle, please develop a simple Ethereum smart contract called PhoenixLocker Protocol.
 
-PhoenixLocker Protocol 智能合约的基本函数功能：
-1.通过用户存款账号转账 USDT 到 智能合约 账号。
-2.按天触发接口提取资金的 1/(18*30) 到存款账号，或者按月提取 1/18 到存款账号
-3.智能合约中的资金只有存款人才能提取。
-4.根据存款账号查询存在智能合约里面的总资金。
-5.根据存款账号查询每个月/每天在智能合约里面的金额。
-6.查询整个智能合约整体存储了多少资金。
-7.查询整个智能合约中包含有资金的账号。
-8.根据钱包地址查询智能合约中取款和存款记录。
+Basic Functions of PhoenixLocker Protocol Smart Contract:
+1. Transfer USDT from user deposit accounts to the smart contract account.
+2. Daily withdrawal of 1/(18*30) of funds to deposit accounts, or monthly withdrawal of 1/18 to deposit accounts.
+3. Only depositors can withdraw funds from the smart contract.
+4. Query total funds in the smart contract by deposit account.
+5. Query monthly/daily amounts in the smart contract by deposit account.
+6. Query total funds stored in the entire smart contract.
+7. Query all accounts with funds in the smart contract.
+8. Query withdrawal and deposit records in the smart contract by wallet address.

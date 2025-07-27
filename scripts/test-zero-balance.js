@@ -2,9 +2,9 @@ const hre = require("hardhat");
 const { ethers } = hre;
 
 async function main() {
-    console.log("🧪 测试余额为0时的可提取金额显示...");
+    console.log("🧪 Testing withdrawable amount display when balance is 0...");
     
-    // 连接到已部署的合约 - 使用最新地址
+    // Connect to deployed contract - use latest address
     const phoenixLockerAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
     const mockUSDTAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
     
@@ -14,62 +14,62 @@ async function main() {
     const phoenixLocker = PhoenixLocker.attach(phoenixLockerAddress);
     const mockUSDT = MockUSDT.attach(mockUSDTAddress);
     
-    // 获取测试账户
+    // Get test accounts
     const [owner, user1, user2, user3] = await ethers.getSigners();
     
-    console.log("\n📥 用户3进行存款操作...");
+    console.log("\n📥 User 3 performing deposit operation...");
     
-    // 给用户3分配USDT
+    // Allocate USDT to user 3
     await mockUSDT.connect(owner).transfer(user3.address, ethers.parseUnits("100", 6));
-    console.log("✅ 用户3获得100 USDT");
+    console.log("✅ User 3 received 100 USDT");
     
-    // 用户3授权并存款
+    // User 3 approves and deposits
     const depositAmount = ethers.parseUnits("100", 6);
     await mockUSDT.connect(user3).approve(phoenixLockerAddress, depositAmount);
     await phoenixLocker.connect(user3).deposit(depositAmount);
-    console.log("✅ 用户3存款100 USDT");
+    console.log("✅ User 3 deposited 100 USDT");
     
-    // 查询存款后的可提取金额
+    // Query withdrawable amount after deposit
     const [dailyBefore, monthlyBefore] = await phoenixLocker.getUserWithdrawableAmounts(user3.address);
-    console.log(`\n📊 存款后可提取金额:`);
-    console.log(`  每日可提取: ${ethers.formatUnits(dailyBefore, 6)} USDT`);
-    console.log(`  每月可提取: ${ethers.formatUnits(monthlyBefore, 6)} USDT`);
+    console.log(`\n📊 Withdrawable amount after deposit:`);
+    console.log(`  Daily withdrawable: ${ethers.formatUnits(dailyBefore, 6)} USDT`);
+    console.log(`  Monthly withdrawable: ${ethers.formatUnits(monthlyBefore, 6)} USDT`);
     
-    // 查询余额
+    // Query balance
     const [totalAmount, remainingBefore, withdrawnBefore] = await phoenixLocker.getUserBalance(user3.address);
-    console.log(`\n💰 存款后余额信息:`);
-    console.log(`  总存款: ${ethers.formatUnits(totalAmount, 6)} USDT`);
-    console.log(`  剩余金额: ${ethers.formatUnits(remainingBefore, 6)} USDT`);
-    console.log(`  已提取: ${ethers.formatUnits(withdrawnBefore, 6)} USDT`);
+    console.log(`\n💰 Balance information after deposit:`);
+    console.log(`  Total deposit: ${ethers.formatUnits(totalAmount, 6)} USDT`);
+    console.log(`  Remaining amount: ${ethers.formatUnits(remainingBefore, 6)} USDT`);
+    console.log(`  Withdrawn: ${ethers.formatUnits(withdrawnBefore, 6)} USDT`);
     
-    console.log("\n🚨 执行紧急提取，清空所有余额...");
+    console.log("\n🚨 Executing emergency withdrawal, clearing all balance...");
     
-    // 紧急提取所有资金
+    // Emergency withdraw all funds
     await phoenixLocker.connect(user3).emergencyWithdraw();
-    console.log("✅ 紧急提取完成");
+    console.log("✅ Emergency withdrawal completed");
     
-    // 查询提取后的余额
+    // Query balance after withdrawal
     const [, remainingAfter, withdrawnAfter] = await phoenixLocker.getUserBalance(user3.address);
-    console.log(`\n💰 提取后余额信息:`);
-    console.log(`  剩余金额: ${ethers.formatUnits(remainingAfter, 6)} USDT`);
-    console.log(`  已提取: ${ethers.formatUnits(withdrawnAfter, 6)} USDT`);
+    console.log(`\n💰 Balance information after withdrawal:`);
+    console.log(`  Remaining amount: ${ethers.formatUnits(remainingAfter, 6)} USDT`);
+    console.log(`  Withdrawn: ${ethers.formatUnits(withdrawnAfter, 6)} USDT`);
     
-    // 查询提取后的可提取金额
+    // Query withdrawable amount after withdrawal
     const [dailyAfter, monthlyAfter] = await phoenixLocker.getUserWithdrawableAmounts(user3.address);
-    console.log(`\n📊 余额为0后的可提取金额:`);
-    console.log(`  每日可提取: ${ethers.formatUnits(dailyAfter, 6)} USDT`);
-    console.log(`  每月可提取: ${ethers.formatUnits(monthlyAfter, 6)} USDT`);
+    console.log(`\n📊 Withdrawable amount after balance is 0:`);
+    console.log(`  Daily withdrawable: ${ethers.formatUnits(dailyAfter, 6)} USDT`);
+    console.log(`  Monthly withdrawable: ${ethers.formatUnits(monthlyAfter, 6)} USDT`);
     
-    // 验证结果
+    // Verify results
     if (dailyAfter.eq(0) && monthlyAfter.eq(0)) {
-        console.log("\n✅ 测试通过: 余额为0时，可提取金额正确显示为0");
+        console.log("\n✅ Test passed: When balance is 0, withdrawable amount correctly shows 0");
     } else {
-        console.log("\n❌ 测试失败: 余额为0时，可提取金额应该为0");
-        console.log(`  实际每日可提取: ${ethers.formatUnits(dailyAfter, 6)}`);
-        console.log(`  实际每月可提取: ${ethers.formatUnits(monthlyAfter, 6)}`);
+        console.log("\n❌ Test failed: When balance is 0, withdrawable amount should be 0");
+        console.log(`  Actual daily withdrawable: ${ethers.formatUnits(dailyAfter, 6)}`);
+        console.log(`  Actual monthly withdrawable: ${ethers.formatUnits(monthlyAfter, 6)}`);
     }
     
-    console.log("\n🎯 测试完成!");
+    console.log("\n🎯 Test completed!");
 }
 
 main()
