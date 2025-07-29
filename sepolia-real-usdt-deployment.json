@@ -1,0 +1,8 @@
+{
+  "network": "sepolia",
+  "phoenixLocker": "0x49cC6d913879276D1860950f1932d5542BdE2603",
+  "sepoliaUSDT": "0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0",
+  "deployer": "0xd177ec921859f3568ecc849b7204CbC8Af8E0F89",
+  "deploymentTime": "2025-07-27T11:29:48.588Z",
+  "note": "Using real Sepolia USDT, not MockUSDT"
+}
