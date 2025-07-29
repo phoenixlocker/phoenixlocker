@@ -104,9 +104,9 @@
                             <div class="text-gray-500 text-xs">USDT</div>
                         </div>
                         <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
-                            <div class="text-2xl font-bold text-yellow-400" id="wallet-usdt-balance">0</div>
+                            <div class="text-2xl font-bold text-yellow-400" id="wallet-usdt-balance"><span class="text-lg">0.00</span> <span class="text-sm text-yellow-300">USDT</span></div>
                             <div class="text-gray-400 text-sm mt-1">My USDT</div>
-                            <div class="text-gray-500 text-xs">Available</div>
+                            <div class="text-gray-500 text-xs">Available Balance</div>
                         </div>
                         <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
                             <div class="text-2xl font-bold text-blue-400" id="eth-balance">0</div>
@@ -229,14 +229,76 @@
         
         let provider, signer, phoenixLocker, usdtContract, userAddress;
         
+        // BSC Network Configuration
+        const BSC_NETWORK = {
+            chainId: '0x38', // 56 in hex
+            chainName: 'BNB Smart Chain',
+            nativeCurrency: {
+                name: 'BNB',
+                symbol: 'BNB',
+                decimals: 18
+            },
+            rpcUrls: ['https://bsc-dataseed1.binance.org/'],
+            blockExplorerUrls: ['https://bscscan.com/']
+        };
+        
+        // Check and switch to BSC network
+        async function ensureBSCNetwork() {
+            try {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId !== BSC_NETWORK.chainId) {
+                    showAlert('Switching to BNB Smart Chain...', 'info');
+                    
+                    try {
+                        // Try to switch to BSC
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: BSC_NETWORK.chainId }]
+                        });
+                    } catch (switchError) {
+                        // If BSC is not added, add it
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [BSC_NETWORK]
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+                    
+                    showAlert('Successfully switched to BNB Smart Chain', 'success');
+                }
+                return true;
+            } catch (error) {
+                showAlert('Failed to switch to BNB Smart Chain: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
         // Connect wallet
         async function connectWallet() {
             try {
                 if (typeof window.ethereum !== 'undefined') {
                     await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    
+                    // Ensure we're on BSC network
+                    const networkSwitched = await ensureBSCNetwork();
+                    if (!networkSwitched) {
+                        return;
+                    }
+                    
                     provider = new ethers.providers.Web3Provider(window.ethereum);
                     signer = provider.getSigner();
                     userAddress = await signer.getAddress();
+                    
+                    // Verify network again after provider creation
+                    const network = await provider.getNetwork();
+                    if (network.chainId !== 56) {
+                        showAlert('Please switch to BNB Smart Chain (BSC) network in MetaMask', 'error');
+                        return;
+                    }
                     
                     phoenixLocker = new ethers.Contract(PHOENIX_LOCKER_ADDRESS, PHOENIX_LOCKER_ABI, signer);
                     usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
@@ -276,7 +338,7 @@
             
             // Clear displayed data
             document.getElementById('user-balance').textContent = '0';
-            document.getElementById('wallet-usdt-balance').textContent = '0';
+            document.getElementById('wallet-usdt-balance').innerHTML = '<span class="text-lg">0.00</span> <span class="text-sm text-yellow-300">USDT</span>';
             document.getElementById('eth-balance').textContent = '0';
             document.getElementById('weekly-withdrawable').textContent = '0';
             document.getElementById('monthly-withdrawable').textContent = '0';
@@ -433,7 +495,16 @@
                     console.log('🔍 USDT Balance Query Debug Info:');
                     console.log('- User Address:', userAddress);
                     console.log('- USDT Contract Address:', USDT_ADDRESS);
-                    console.log('- Network Info:', await provider.getNetwork());
+                    
+                    const network = await provider.getNetwork();
+                    console.log('- Network Info:', network);
+                    console.log('- Chain ID:', network.chainId);
+                    console.log('- Network Name:', network.name);
+                    
+                    // Verify we're on BSC network
+                    if (network.chainId !== 56) {
+                        throw new Error(`Wrong network detected. Expected BSC (Chain ID: 56), but got Chain ID: ${network.chainId}. Please switch to BNB Smart Chain in MetaMask.`);
+                    }
                     
                     // Check if contract exists
                     const contractCode = await provider.getCode(USDT_ADDRESS);
@@ -441,7 +512,7 @@
                     console.log('- Contract Exists:', contractCode !== '0x');
                     
                     if (contractCode === '0x') {
-                        throw new Error(`USDT contract not deployed at address ${USDT_ADDRESS}`);
+                        throw new Error(`USDT contract not deployed at address ${USDT_ADDRESS} on BSC network. Please verify you are connected to BNB Smart Chain.`);
                     }
                     
                     // Check current block number
@@ -449,13 +520,36 @@
                     console.log('- Current Block Number:', blockNumber);
                     
                     const balance = await usdtContract.balanceOf(userAddress);
-                    const formattedBalance = ethers.utils.formatUnits(balance, 6);
-                    const roundedBalance = parseFloat(formattedBalance).toFixed(2);
-                    document.getElementById('wallet-usdt-balance').textContent = roundedBalance;
+                    console.log('🔍 Raw USDT Balance:', balance.toString());
                     
-                    console.log('✅ USDT Balance Query Successful:', roundedBalance);
+                    // 获取USDT合约的实际小数位数
+                    const decimals = await usdtContract.decimals();
+                    console.log('🔍 USDT Decimals:', decimals);
+                    
+                    // 使用实际的小数位数格式化
+                    const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+                    console.log('🔍 Formatted Balance:', formattedBalance);
+                    
+                    const numericBalance = parseFloat(formattedBalance);
+                    
+                    // 格式化显示：如果余额大于等于1000，使用千分位分隔符
+                    let displayBalance;
+                    if (numericBalance >= 1000) {
+                        displayBalance = numericBalance.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                    } else {
+                        displayBalance = numericBalance.toFixed(2);
+                    }
+                    
+                    console.log('🔍 Final Display Balance:', displayBalance);
+                    
+                    // 添加USDT符号和改进显示
+                    document.getElementById('wallet-usdt-balance').innerHTML = `<span class="text-lg">${displayBalance}</span> <span class="text-sm text-yellow-300">USDT</span>`;
+                    console.log('✅ USDT Balance Query Successful:', displayBalance);
                 } else {
-                    document.getElementById('wallet-usdt-balance').textContent = 'Not Linked';
+                    document.getElementById('wallet-usdt-balance').innerHTML = '<span class="text-sm text-gray-400">Not Linked</span>';
                     console.log('⚠️ Wallet not connected or contract not initialized');
                 }
             } catch (error) {
@@ -473,11 +567,19 @@
                     console.error('- Transaction Info:', error.transaction);
                 }
                 
-                document.getElementById('wallet-usdt-balance').textContent = 'Check Failed';
+                document.getElementById('wallet-usdt-balance').innerHTML = '<span class="text-sm text-red-400">Check Failed</span>';
                 
-                // Detailed error handling
+                // Enhanced error handling with network check
                 let errorMessage = 'USDT balance query failed';
-                if (error.code === 'CALL_EXCEPTION') {
+                if (error.message.includes('Wrong network detected')) {
+                    errorMessage = error.message;
+                    // Try to switch network automatically
+                    setTimeout(async () => {
+                        await ensureBSCNetwork();
+                    }, 2000);
+                } else if (error.message.includes('USDT contract not deployed')) {
+                    errorMessage = error.message;
+                } else if (error.code === 'CALL_EXCEPTION') {
                     errorMessage += ' - Contract call exception';
                     if (error.reason) {
                         errorMessage += `: ${error.reason}`;
@@ -599,6 +701,18 @@
         
         // Check wallet connection on page load
         window.addEventListener('load', async () => {
+            // Check network status first
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                    if (chainId !== BSC_NETWORK.chainId) {
+                        showAlert('Please connect to BNB Smart Chain for proper functionality', 'error');
+                    }
+                } catch (error) {
+                    console.log('Could not check network on load:', error);
+                }
+            }
+            
             await updateBNBBalance();
             
             if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
@@ -613,6 +727,19 @@
                     location.reload();
                 } else {
                     connectWallet();
+                }
+            });
+            
+            // Listen for network changes
+            window.ethereum.on('chainChanged', (chainId) => {
+                if (chainId !== BSC_NETWORK.chainId) {
+                    showAlert('Please switch back to BNB Smart Chain for proper functionality', 'error');
+                    disconnectWallet();
+                } else {
+                    // Reconnect when switched back to BSC
+                    if (userAddress) {
+                        connectWallet();
+                    }
                 }
             });
         }
