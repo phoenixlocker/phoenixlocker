@@ -110,7 +110,7 @@
                         </div>
                         <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
                             <div class="text-2xl font-bold text-blue-400" id="eth-balance">0</div>
-                            <div class="text-gray-400 text-sm mt-1">My ETH</div>
+                            <div class="text-gray-400 text-sm mt-1">My BNB</div>
                             <div class="text-gray-500 text-xs">For Fees</div>
                         </div>
                         <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
@@ -201,8 +201,8 @@
 
     <script>
         // Contract addresses and ABI
-        const PHOENIX_LOCKER_ADDRESS = '0x49cC6d913879276D1860950f1932d5542BdE2603';
-        const MOCK_USDT_ADDRESS = '0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0'; // Valid Sepolia USDT
+        const PHOENIX_LOCKER_ADDRESS = '0x1399216420db6c02E6Cd9Cf32BD6bbC3F1aF05C0'; // BSC Mainnet
+        const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955'; // BSC USDT
         
         // Simplified ABI
         const PHOENIX_LOCKER_ABI = [
@@ -239,7 +239,7 @@
                     userAddress = await signer.getAddress();
                     
                     phoenixLocker = new ethers.Contract(PHOENIX_LOCKER_ADDRESS, PHOENIX_LOCKER_ABI, signer);
-                    usdtContract = new ethers.Contract(MOCK_USDT_ADDRESS, USDT_ABI, signer);
+                    usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
                     
                     const shortAddress = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
                     document.getElementById('wallet-address-nav').textContent = shortAddress;
@@ -248,7 +248,7 @@
                     document.getElementById('connection-alert').style.display = 'none';
         
                     
-                    await updateETHBalance();
+                    await updateBNBBalance();
                     await updateWalletUSDTBalance();
                     showAlert('Wallet linked successfully!', 'success');
                     await updateUI();
@@ -315,7 +315,7 @@
                 showAlert('Token added successfully!', 'success');
                 document.getElementById('deposit-amount').value = '';
                 await updateUI();
-                await updateETHBalance();
+                await updateBNBBalance();
                 await updateWalletUSDTBalance();
             } catch (error) {
                 // Handle specific block tag errors
@@ -343,7 +343,7 @@
                 await tx.wait();
                 showAlert('Weekly Token taken successfully!', 'success');
                 await updateUI();
-                await updateETHBalance();
+                await updateBNBBalance();
                 await updateWalletUSDTBalance();
             } catch (error) {
                 let errorMessage = 'Failed to take Token';
@@ -372,7 +372,7 @@
                 await tx.wait();
                 showAlert('Monthly Token taken successfully!', 'success');
                 await updateUI();
-                await updateETHBalance();
+                await updateBNBBalance();
                 await updateWalletUSDTBalance();
             } catch (error) {
                 let errorMessage = 'Failed to take Token';
@@ -399,8 +399,8 @@
          
 
          
-        // Update ETH balance
-        async function updateETHBalance() {
+        // Update BNB balance
+        async function updateBNBBalance() {
             try {
                 if (provider && userAddress) {
                     const balance = await provider.getBalance(userAddress);
@@ -411,7 +411,7 @@
                     document.getElementById('eth-balance').textContent = 'Not Linked';
                 }
             } catch (error) {
-                console.error('Failed to get ETH balance:', error);
+                console.error('Failed to get BNB balance:', error);
                 document.getElementById('eth-balance').textContent = 'Check Failed';
                 
                 // Handle specific block tag errors
@@ -420,7 +420,7 @@
                 } else if (error.message.includes('missing revert data')) {
                     showAlert('Contract call failed, please check network connection and contract address', 'error');
                 } else {
-                    showAlert('Failed to check ETH balance: ' + error.message, 'error');
+                    showAlert('Failed to check BNB balance: ' + error.message, 'error');
                 }
             }
         }
@@ -432,16 +432,16 @@
                     // Detailed debug information
                     console.log('🔍 USDT Balance Query Debug Info:');
                     console.log('- User Address:', userAddress);
-                    console.log('- USDT Contract Address:', MOCK_USDT_ADDRESS);
+                    console.log('- USDT Contract Address:', USDT_ADDRESS);
                     console.log('- Network Info:', await provider.getNetwork());
                     
                     // Check if contract exists
-                    const contractCode = await provider.getCode(MOCK_USDT_ADDRESS);
+                    const contractCode = await provider.getCode(USDT_ADDRESS);
                     console.log('- Contract Code Length:', contractCode.length);
                     console.log('- Contract Exists:', contractCode !== '0x');
                     
                     if (contractCode === '0x') {
-                        throw new Error(`USDT contract not deployed at address ${MOCK_USDT_ADDRESS}`);
+                        throw new Error(`USDT contract not deployed at address ${USDT_ADDRESS}`);
                     }
                     
                     // Check current block number
@@ -485,7 +485,7 @@
                     if (error.method) {
                         errorMessage += ` (Method: ${error.method})`;
                     }
-                    errorMessage += ` (Contract Address: ${MOCK_USDT_ADDRESS})`;
+                    errorMessage += ` (Contract Address: ${USDT_ADDRESS})`;
                 } else if (error.message.includes('invalid block tag') || error.message.includes('Latest block number')) {
                     errorMessage = 'Network sync issue, please switch networks in MetaMask or reset account to clear cache';
                 } else if (error.message.includes('missing revert data')) {
@@ -529,7 +529,7 @@
                 document.getElementById('weekly-time-limit').textContent = `${weeksLeft} weeks left`;
                 document.getElementById('monthly-time-limit').textContent = `${monthsLeft} months left`;
                 
-                await updateETHBalance();
+                await updateBNBBalance();
                 await updateWalletUSDTBalance();
             } catch (error) {
                 console.error('Failed to update UI:', error);
@@ -599,7 +599,7 @@
         
         // Check wallet connection on page load
         window.addEventListener('load', async () => {
-            await updateETHBalance();
+            await updateBNBBalance();
             
             if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
                 await connectWallet();

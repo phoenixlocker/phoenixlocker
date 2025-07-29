@@ -162,16 +162,72 @@ await phoenixLocker.withdrawMonthly();
 
 ## Deployment Instructions
 
-### Mainnet Deployment
-1. Modify the USDT address in `scripts/deploy.js` to the mainnet address
-2. Configure network settings in `hardhat.config.js`
-3. Set private key and RPC node
-4. Run deployment script
+### Supported Networks
 
-### Testnet Deployment
-1. Use testnet USDT address or deploy MockUSDT
-2. Obtain testnet ETH for gas fees
-3. Run deployment script
+#### Ethereum Mainnet
+- **Chain ID**: 1
+- **USDT Address**: `0xdAC17F958D2ee523a2206206994597C13D831ec7`
+- **RPC**: Infura/Alchemy
+- **Gas Token**: ETH
+
+#### BNB Smart Chain (BSC) ✅ Deployed
+- **Chain ID**: 56
+- **USDT Address**: `0x55d398326f99059fF775485246999027B3197955`
+- **RPC**: https://bsc.publicnode.com
+- **Gas Token**: BNB
+- **Contract Address**: `0x1399216420db6c02E6Cd9Cf32BD6bbC3F1aF05C0`
+- **Contract Explorer**: https://bscscan.com/address/0x1399216420db6c02E6Cd9Cf32BD6bbC3F1aF05C0
+
+#### Sepolia Testnet
+- **Chain ID**: 11155111
+- **Gas Token**: Sepolia ETH
+
+### Deployment Steps
+
+#### Deploy to Ethereum Mainnet
+```bash
+# Check balance
+npx hardhat run scripts/check-balance.js --network mainnet
+
+# Deploy contract
+npx hardhat run scripts/deploy-simple.js --network mainnet
+```
+
+#### Deploy to BNB Smart Chain
+```bash
+# Check BNB balance
+npx hardhat run scripts/check-bsc-balance.js --network bsc
+
+# Verify USDT contract
+npx hardhat run scripts/verify-bsc-usdt.js --network bsc
+
+# Deploy contract
+npx hardhat run scripts/deploy-bsc-simple.js --network bsc
+
+# Verify deployment
+npx hardhat run scripts/verify-bsc-deployment.js --network bsc
+```
+
+#### Deploy to Testnet
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+### Prerequisites
+
+1. **Environment Setup**
+   - Create `.env` file with `PRIVATE_KEY` and `INFURA_PROJECT_ID`
+   - Ensure wallet has sufficient gas tokens
+
+2. **Gas Requirements**
+   - **Ethereum**: ~0.0003 ETH for deployment
+   - **BSC**: ~0.000005 BNB for deployment
+
+3. **Network Configuration**
+   - All networks are pre-configured in `hardhat.config.js`
+   - BSC configuration includes optimized gas settings
+
+For detailed BSC deployment instructions, see [BSC_DEPLOYMENT_GUIDE.md](./BSC_DEPLOYMENT_GUIDE.md)
 
 ## License
 

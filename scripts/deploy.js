@@ -13,8 +13,17 @@ async function main() {
   
   console.log("Using USDT contract address:", USDT_ADDRESS);
   
-  // Deploy contract
-  const phoenixLocker = await PhoenixLocker.deploy(USDT_ADDRESS);
+  // Get current gas price but use a more conservative approach
+   const feeData = await hre.ethers.provider.getFeeData();
+   const gasPrice = feeData.gasPrice; // Use current gas price without buffer
+   
+   console.log("Using gas price:", hre.ethers.formatUnits(gasPrice, "gwei"), "gwei");
+   
+   // Deploy contract with conservative gas settings
+   const phoenixLocker = await PhoenixLocker.deploy(USDT_ADDRESS, {
+     gasPrice: gasPrice,
+     gasLimit: 800000 // Conservative gas limit
+   });
   
   await phoenixLocker.waitForDeployment();
   
