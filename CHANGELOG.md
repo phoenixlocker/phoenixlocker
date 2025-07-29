@@ -5,6 +5,26 @@ All notable changes to the PhoenixLocker Protocol will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2024-12-24
+
+### Fixed
+- **USDT Balance Display**: Fixed USDT balance formatting issue in frontend DApp
+  - Resolved incorrect balance display showing 25,131,051.36 USDT instead of 25.13 USDT
+  - Implemented dynamic decimal detection using `usdtContract.decimals()` function
+  - Replaced hardcoded 6-decimal formatting with actual contract decimal precision
+  - Added debugging logs for balance formatting troubleshooting
+  - Maintained thousand separator formatting and USDT symbol display
+- **Balance Calculation**: Improved accuracy of USDT balance calculations
+  - Enhanced `updateWalletUSDTBalance()` function with proper decimal handling
+  - Added real-time decimal precision detection for better compatibility
+  - Ensured consistent formatting across different USDT contract implementations
+
+### Technical Details
+- **Issue**: Hardcoded 6-decimal formatting caused incorrect balance display
+- **Solution**: Dynamic decimal detection using contract's `decimals()` method
+- **Impact**: Accurate USDT balance display for all users
+- **Compatibility**: Works with any ERC-20 token with standard decimals() function
+
 ## [1.1.0] - 2024-12-19
 
 ### Added
@@ -54,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ USDT integration confirmed
 - ✅ 18-month lock period configuration verified
 - ✅ Owner permissions properly set
+
+## [1.0.1] - 2024-12-20
+
+### Fixed
+- **Frontend Network Compatibility**: Resolved network compatibility issues for BSC integration
+- **Network Auto-Switch**: Added automatic BSC network detection and switching
+  - Implemented `ensureBSCNetwork()` function for automatic network switching
+  - Added BSC network configuration with proper RPC endpoints
+  - Added network change listener to handle user network switches
+  - Enhanced error handling for network-related issues
 
 ## [1.0.0] - 2024-12-18
 
