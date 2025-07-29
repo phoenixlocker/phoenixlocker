@@ -610,19 +610,47 @@
         
         // Calculate time limits
         async function calculateTimeLimits(totalDepositAmount) {
-            // Assume 1000 USDT can be withdrawn for 78 weeks, 5000 USDT for 18 months
-            // This uses simplified calculation logic, should be adjusted according to contract logic
+            // 重新设计时间限制计算逻辑
+            // 基于存款金额计算可提取的周数和月数
             const decimals = await usdtContract.decimals();
             const depositInUSDT = parseFloat(ethers.utils.formatUnits(totalDepositAmount || 0, decimals));
             
-            let weeksLeft = Math.floor((depositInUSDT / 1000) * 78);
-            let monthsLeft = Math.floor((depositInUSDT / 5000) * 18);
+            console.log('🔍 CalculateTimeLimits - Deposit Amount:', depositInUSDT, 'USDT');
             
-            // Set minimum and maximum values
-            weeksLeft = Math.max(0, Math.min(weeksLeft, 78));
-            monthsLeft = Math.max(0, Math.min(monthsLeft, 18));
+            // 新的计算逻辑：
+            // 每周可提取金额 = 总存款 / 78 (最多78周)
+            // 每月可提取金额 = 总存款 / 18 (最多18个月)
+            // 剩余周数 = 剩余金额 / 每周可提取金额
+            // 剩余月数 = 剩余金额 / 每月可提取金额
             
-            return { weeksLeft, monthsLeft };
+            if (depositInUSDT <= 0) {
+                return { weeksLeft: 0, monthsLeft: 0 };
+            }
+            
+            // 假设最大提取期限
+            const maxWeeks = 78;
+            const maxMonths = 18;
+            
+            // 计算每周和每月的基础提取额度
+            const weeklyAllowance = depositInUSDT / maxWeeks;
+            const monthlyAllowance = depositInUSDT / maxMonths;
+            
+            // 基于当前余额计算剩余时间
+            // 这里使用总存款作为剩余金额的近似值
+            // 实际应该使用合约中的剩余余额
+            const weeksLeft = Math.ceil(depositInUSDT / weeklyAllowance);
+            const monthsLeft = Math.ceil(depositInUSDT / monthlyAllowance);
+            
+            // 限制在最大值内
+            const finalWeeksLeft = Math.max(0, Math.min(weeksLeft, maxWeeks));
+            const finalMonthsLeft = Math.max(0, Math.min(monthsLeft, maxMonths));
+            
+            console.log('🔍 CalculateTimeLimits - Weekly Allowance:', weeklyAllowance.toFixed(2), 'USDT');
+            console.log('🔍 CalculateTimeLimits - Monthly Allowance:', monthlyAllowance.toFixed(2), 'USDT');
+            console.log('🔍 CalculateTimeLimits - Weeks Left:', finalWeeksLeft);
+            console.log('🔍 CalculateTimeLimits - Months Left:', finalMonthsLeft);
+            
+            return { weeksLeft: finalWeeksLeft, monthsLeft: finalMonthsLeft };
         }
         
         // Update UI
