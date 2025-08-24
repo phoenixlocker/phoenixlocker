@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aave V3 Liquidation | DeFi Liquidation Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        }
+        .aave-animation {
+            animation: aave-pulse 3s ease-in-out infinite alternate;
+        }
+        @keyframes aave-pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #8b5cf6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .glass-card {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+        .aave-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .liquidation-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .liquidation-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .health-factor-critical {
+            color: #ef4444;
+            animation: pulse 2s infinite;
+        }
+        .health-factor-warning {
+            color: #f59e0b;
+        }
+        .health-factor-safe {
+            color: #10b981;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen" style="transform: scale(0.75); transform-origin: top left; width: 133.33%; height: 133.33%;">
+    <!-- Navigation -->
+    <nav class="py-6 px-4 sm:px-12 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <i class="fas fa-gavel text-2xl text-red-500 aave-animation"></i>
+            <span class="text-xl font-bold bg-clip-text text-transparent gradient-bg">Aave V3 Liquidation</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <a href="aavev3.html" class="text-gray-400 hover:text-purple-500 transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+            </a>
+            
+            <!-- Network Switcher -->
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-400">Network:</span>
+                <select id="network-switcher" class="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 transition-colors">
+                    <option value="mainnet" selected>Ethereum Mainnet</option>
+                    <option value="sepolia">Sepolia Testnet</option>
+                    <option value="polygon">Polygon</option>
+                    <option value="arbitrum">Arbitrum</option>
+                    <option value="optimism">Optimism</option>
+                </select>
+            </div>
+            
+            <div id="wallet-status" class="text-sm">
+                <button onclick="connectWallet()" id="nav-connect-btn" class="aave-gradient hover:opacity-90 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-purple-500/20">
+                    Connect Wallet
+                </button>
+                <div id="wallet-connected" class="flex items-center space-x-3" style="display: none;">
+                    <span id="wallet-address-nav" class="text-gray-300 font-mono bg-gray-800 px-3 py-2 rounded-lg"></span>
+                    <button onclick="disconnectWallet()" id="nav-disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105">
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="min-h-screen flex flex-col">
+        <main class="flex-grow">
+            <div class="container mx-auto px-4 py-8 max-w-7xl">
+                <div class="flex gap-6">
+                    <!-- Left Column - Main Content -->
+                    <div class="flex-1">
+                        <!-- Connection Alert -->
+                        <div id="connection-alert" class="text-center py-12 mb-8">
+                            <div class="max-w-md mx-auto">
+                                <div class="mb-6">
+                                    <i class="fas fa-wallet text-4xl text-purple-500 mb-4"></i>
+                                    <h2 class="text-2xl font-bold mb-2">Connect Your Wallet</h2>
+                                    <p class="text-gray-400">Connect your MetaMask wallet to view liquidation opportunities</p>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                        <!-- Hero Section -->
+                        <div class="text-center mb-12">
+                    <h1 class="text-3xl md:text-4xl font-bold mb-4">
+                        <span class="bg-clip-text text-transparent gradient-bg">Aave V3 Liquidation Dashboard</span>
+                    </h1>
+                    <p class="text-gray-400 mb-8 max-w-2xl mx-auto">Monitor and execute liquidations on Aave V3 Protocol to earn liquidation bonuses</p>
+                    
+                    <!-- Refresh Controls -->
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button onclick="refreshLiquidationData()" id="refresh-btn" class="aave-gradient hover:opacity-90 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-purple-500/20">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh Data
+                        </button>
+                        
+                        <div class="flex items-center gap-3 text-sm">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="auto-refresh" checked class="rounded border-gray-600 bg-gray-800 text-purple-500 focus:ring-purple-500">
+                                <span class="text-gray-300">Auto Refresh</span>
+                            </label>
+                            <select id="refresh-interval" class="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500">
+                                <option value="3">3s</option>
+                                <option value="5" selected>5s</option>
+                                <option value="10">10s</option>
+                                <option value="30">30s</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Last Refresh Time -->
+                    <div class="text-center mt-4">
+                        <div class="text-gray-400 text-sm">
+                            <i class="fas fa-clock mr-1"></i>
+                            <span>Last refreshed: </span>
+                            <span id="last-refresh-time" class="text-gray-300">Never</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Health Factor Filter -->
+                    <div class="text-center mt-4">
+                        <div class="flex items-center justify-center gap-3 text-sm">
+                            <label class="flex items-center gap-2 text-gray-300">
+                                <i class="fas fa-filter mr-1"></i>
+                                <span>Health Factor ≤</span>
+                            </label>
+                            <input type="number" id="health-factor-filter" value="1" min="0" max="10" step="0.1" 
+                                   class="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500 w-20">
+                            <span class="text-gray-400 text-xs">Filter liquidatable positions</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Address Check -->
+                    <div class="text-center mt-4">
+                        <div class="flex items-center justify-center gap-3 text-sm">
+                            <label class="flex items-center gap-2 text-gray-300">
+                                <i class="fas fa-search mr-1"></i>
+                                <span>Check Address:</span>
+                            </label>
+                            <input type="text" id="address-input" placeholder="Enter wallet address (0x...)" 
+                                   class="px-3 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-purple-500 w-80">
+                            <button id="check-address-btn" class="px-4 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm transition-colors">
+                                Check
+                            </button>
+                        </div>
+                    </div>
+                        </div>
+
+                        <!-- Liquidation Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                        <div class="text-2xl font-bold text-red-400" id="total-liquidatable">0</div>
+                        <div class="text-gray-400 text-sm mt-1">Liquidatable Positions</div>
+                        <div class="text-gray-500 text-xs">Available Now</div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                        <div class="text-2xl font-bold text-yellow-400" id="total-liquidation-value">$0</div>
+                        <div class="text-gray-400 text-sm mt-1">Total Liquidation Value</div>
+                        <div class="text-gray-500 text-xs">USD Value</div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                        <div class="text-2xl font-bold text-green-400" id="potential-bonus">$0</div>
+                        <div class="text-gray-400 text-sm mt-1">Potential Bonus</div>
+                        <div class="text-gray-500 text-xs">Liquidation Reward</div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                        <div class="text-2xl font-bold text-purple-400" id="avg-health-factor">∞</div>
+                        <div class="text-gray-400 text-sm mt-1">Avg Health Factor</div>
+                        <div class="text-gray-500 text-xs">Risk Level</div>
+                    </div>
+                        </div>
+
+                        <!-- Address Check Results -->
+                <div id="address-check-results" class="mb-8">
+                    <!-- Address check results will be displayed here -->
+                        </div>
+
+                        <!-- Liquidation Opportunities Table -->
+                <div class="glass-card rounded-2xl p-8 mb-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold">Liquidation Opportunities</h3>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-400">Real-time scanning:</span>
+                            <span class="text-xs text-gray-500">Requires subgraph/indexing service</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-700">
+                                    <th class="text-left py-3 px-4">User Address</th>
+                                    <th class="text-left py-3 px-4">Health Factor</th>
+                                    <th class="text-left py-3 px-4">Collateral</th>
+                                    <th class="text-left py-3 px-4">Debt</th>
+                                    <th class="text-left py-3 px-4">Max Liquidation</th>
+                                    <th class="text-left py-3 px-4">Liquidation Bonus</th>
+                                    <th class="text-left py-3 px-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liquidation-table-body">
+                                <tr>
+                                    <td colspan="7" class="text-center py-8 text-gray-400">
+                                        <i class="fas fa-info-circle text-2xl mb-2"></i>
+                                        <div>Real-time liquidation scanning not available</div>
+                                        <div class="text-xs mt-1">Use the address checker above to check specific positions</div>
+                                        <div class="text-xs mt-1">Real-time scanning requires Aave subgraph or event indexing</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                        </div>
+
+                        <!-- Liquidation Guide -->
+                        <div class="glass-card rounded-2xl p-8">
+                            <h3 class="text-2xl font-bold mb-6">Liquidation Guide</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 text-purple-400">How Liquidation Works</h4>
+                            <ul class="space-y-2 text-gray-300">
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-check text-green-400 mt-1"></i>
+                                    <span>Positions become liquidatable when Health Factor < 1.0</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-check text-green-400 mt-1"></i>
+                                    <span>Liquidators can repay up to 50% of the debt</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-check text-green-400 mt-1"></i>
+                                    <span>Receive collateral + liquidation bonus (typically 5-10%)</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-check text-green-400 mt-1"></i>
+                                    <span>Gas costs should be considered for profitability</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 text-yellow-400">Risk Factors</h4>
+                            <ul class="space-y-2 text-gray-300">
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                                    <span>Market volatility can affect liquidation profitability</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                                    <span>High gas fees may reduce or eliminate profits</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                                    <span>Competition from MEV bots and other liquidators</span>
+                                </li>
+                                <li class="flex items-start space-x-2">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400 mt-1"></i>
+                                    <span>Slippage when converting received collateral</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column - Status & Alerts -->
+                    <div class="w-80 flex-shrink-0">
+                        <div class="sticky top-8 space-y-4">
+                            <!-- Loading Status -->
+                            <div id="loading" class="hidden glass-card rounded-2xl p-6">
+                                <div class="text-center">
+                                    <div class="spinner mb-3"></div>
+                                    <p class="text-gray-300 text-sm">Loading liquidation data...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- System Alerts -->
+                            <div class="glass-card rounded-2xl p-6">
+                                <h3 class="text-lg font-bold mb-4 flex items-center">
+                                    <i class="fas fa-bell mr-2 text-purple-400"></i>
+                                    <span>系统提醒</span>
+                                </h3>
+                                <div id="alerts" class="space-y-3">
+                                    <!-- Alerts will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 px-4 sm:px-12 border-t border-gray-800/50 mt-12">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center space-x-2 mb-4 md:mb-0">
+                        <i class="fas fa-gavel text-xl text-red-500 aave-animation"></i>
+                        <span class="text-lg font-bold bg-clip-text text-transparent gradient-bg">Aave V3 Liquidation</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="https://aave.com" target="_blank" class="text-gray-400 hover:text-purple-500 transition-colors">
+                            <i class="fas fa-external-link-alt text-xl"></i>
+                            <span class="ml-2">Official Site</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="mt-6 text-center text-gray-500 text-sm">
+                    © 2023 Aave V3 Liquidation Interface. Powered by Aave and PhoenixLocker.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Network configurations
+        const NETWORKS = {
+            mainnet: {
+                chainId: '0x1',
+                chainName: 'Ethereum Mainnet',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.infura.io/v3/'],
+                blockExplorerUrls: ['https://etherscan.io/'],
+                aavePoolAddress: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2',
+                aaveOracleAddress: '0x54586bE62E3c3580375aE3723C145253060Ca0C2'
+            },
+            sepolia: {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia test network',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://sepolia.infura.io/v3/'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io/'],
+                aavePoolAddress: '0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951',
+                aaveOracleAddress: '0x2da88497588bf89281816106C7259e31AF45a663'
+            },
+            polygon: {
+                chainId: '0x89',
+                chainName: 'Polygon Mainnet',
+                nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+                rpcUrls: ['https://polygon-rpc.com/'],
+                blockExplorerUrls: ['https://polygonscan.com/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+                aaveOracleAddress: '0xb023e699F5a33916Ea823A16485e259257cA8Bd1'
+            },
+            arbitrum: {
+                chainId: '0xa4b1',
+                chainName: 'Arbitrum One',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+                blockExplorerUrls: ['https://arbiscan.io/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+                aaveOracleAddress: '0xb56c2F0B653B2e0b10C9b928C637b3f50B20c927'
+            },
+            optimism: {
+                chainId: '0xa',
+                chainName: 'Optimism',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.optimism.io'],
+                blockExplorerUrls: ['https://optimistic.etherscan.io/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+                aaveOracleAddress: '0xD81eb3728a631871a7eBBaD631b5f424909f0c77'
+            }
+        };
+        
+        // Current network (default to Mainnet)
+        let currentNetwork = 'mainnet';
+        
+        // Get current network configuration
+        function getCurrentNetworkConfig() {
+            return NETWORKS[currentNetwork];
+        }
+        
+        // Contract addresses (dynamic based on network)
+        let AAVE_POOL_ADDRESS = getCurrentNetworkConfig().aavePoolAddress;
+        let AAVE_ORACLE_ADDRESS = getCurrentNetworkConfig().aaveOracleAddress;
+        
+        // Asset configurations
+        const ASSETS = {
+            USDT: {
+                symbol: 'USDT',
+                name: 'Tether USD',
+                address: '0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0',
+                aTokenAddress: '0x6c23b444d1522136b99f56c22505507d3ae3012a',
+                decimals: 6
+            },
+            USDC: {
+                symbol: 'USDC',
+                name: 'USD Coin',
+                address: '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8',
+                aTokenAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+                decimals: 6
+            },
+            WBTC: {
+                symbol: 'WBTC',
+                name: 'Wrapped Bitcoin',
+                address: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+                aTokenAddress: '0x1804bf30507dc2eb3bdebbbdd859991eaef6eeff',
+                decimals: 8
+            },
+            WETH: {
+                symbol: 'WETH',
+                name: 'Wrapped Ethereum',
+                address: '0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c',
+                aTokenAddress: '0x5b071b590a59395fE4025A0Ccc1FcC931AAc1830',
+                decimals: 18
+            }
+        };
+        
+        // Simplified ABIs
+        const AAVE_POOL_ABI = [
+            'function getUserAccountData(address user) external view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)',
+            'function liquidationCall(address collateralAsset, address debtAsset, address user, uint256 debtToCover, bool receiveAToken) external',
+            'function getReserveData(address asset) external view returns (uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt)'
+        ];
+        
+        const ERC20_ABI = [
+            'function balanceOf(address owner) external view returns (uint256)',
+            'function approve(address spender, uint256 amount) external returns (bool)',
+            'function allowance(address owner, address spender) external view returns (uint256)',
+            'function decimals() external view returns (uint8)'
+        ];
+        
+        let provider, signer, aavePool, userAddress;
+        let isConnected = false;
+        let autoRefreshInterval;
+        
+        // Sample liquidatable positions for demo (using proper checksum addresses)
+        // Real liquidation opportunities will be fetched from Aave protocol
+        // No more sample data - only real positions from Sepolia testnet
+        
+        // Utility function to ensure proper address checksum without ENS resolution
+        function toChecksumAddress(address) {
+            try {
+                // Check if it's already a valid address format (not ENS)
+                if (!address || !address.startsWith('0x') || address.length !== 42) {
+                    console.warn('Invalid address format:', address);
+                    return address;
+                }
+                
+                // Manual checksum calculation to avoid ENS resolution
+                const addr = address.toLowerCase().replace('0x', '');
+                const hash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(addr));
+                let checksumAddress = '0x';
+                
+                for (let i = 0; i < addr.length; i++) {
+                    if (parseInt(hash[i + 2], 16) >= 8) {
+                        checksumAddress += addr[i].toUpperCase();
+                    } else {
+                        checksumAddress += addr[i];
+                    }
+                }
+                
+                return checksumAddress;
+            } catch (error) {
+                console.error('Error calculating checksum for address:', address, error);
+                return address;
+            }
+        }
+        
+        // Validate address without ENS resolution
+        function isValidAddress(address) {
+            try {
+                if (!address || !address.startsWith('0x') || address.length !== 42) {
+                    return false;
+                }
+                
+                // Check if all characters after 0x are valid hex
+                const hexPart = address.slice(2);
+                return /^[0-9a-fA-F]{40}$/.test(hexPart);
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // Sepolia Network Configuration
+        const SEPOLIA_NETWORK = {
+            chainId: '0xaa36a7',
+            chainName: 'Sepolia test network',
+            nativeCurrency: {
+                name: 'Ethereum',
+                symbol: 'ETH',
+                decimals: 18
+            },
+            rpcUrls: ['https://sepolia.infura.io/v3/'],
+            blockExplorerUrls: ['https://sepolia.etherscan.io/']
+        };
+        
+        // Switch to specific network
+        async function switchToNetwork(networkKey) {
+            try {
+                const networkConfig = NETWORKS[networkKey];
+                if (!networkConfig) {
+                    throw new Error('Unsupported network');
+                }
+                
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId !== networkConfig.chainId) {
+                    showAlert(`Switching to ${networkConfig.chainName}...`, 'info');
+                    
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: networkConfig.chainId }]
+                        });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [networkConfig]
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+                    
+                    // Update current network
+                    currentNetwork = networkKey;
+                    
+                    // Update contract addresses
+                    const config = getCurrentNetworkConfig();
+                    AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                    
+                    showAlert(`Successfully switched to ${networkConfig.chainName}`, 'success');
+                    
+                    // Reconnect wallet if already connected
+                    if (userAddress) {
+                        await connectWallet();
+                    }
+                }
+                return true;
+            } catch (error) {
+                showAlert(`Failed to switch network: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Handle network selection change
+        async function onNetworkChange() {
+            const networkSelect = document.getElementById('network-switcher');
+            const selectedNetwork = networkSelect.value;
+            
+            if (selectedNetwork !== currentNetwork) {
+                await switchToNetwork(selectedNetwork);
+            }
+        }
+        
+        // Check and switch to Sepolia network (legacy function for compatibility)
+        async function ensureSepoliaNetwork() {
+            return await switchToNetwork('sepolia');
+        }
+        
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum !== 'undefined') {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    
+                    // Get current network and update UI
+                     const currentNetworkInfo = await provider.getNetwork();
+                     const networkKey = Object.keys(NETWORKS).find(key =>
+                parseInt(NETWORKS[key].chainId, 16) === currentNetworkInfo.chainId
+                     );
+                    
+                    if (networkKey) {
+                        currentNetwork = networkKey;
+                        document.getElementById('network-switcher').value = networkKey;
+                        
+                        // Update contract addresses for current network
+                        const config = getCurrentNetworkConfig();
+                        AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                    } else {
+                        showAlert('Unsupported network. Please switch to a supported network.', 'error');
+                        return;
+                    }
+                    
+                    // Get address without ENS resolution
+                    try {
+                        userAddress = await signer.getAddress();
+                    } catch (error) {
+                        if (error.message.includes('ENS') || error.message.includes('getResolver')) {
+                            throw new Error('ENS resolution not supported on Sepolia. Please ensure your wallet is properly connected.');
+                        }
+                        throw error;
+                    }
+                    
+                    // Validate user address
+                    if (!isValidAddress(userAddress)) {
+                        throw new Error('Invalid wallet address returned');
+                    }
+                    
+                    // Apply checksum to user address
+                    userAddress = toChecksumAddress(userAddress);
+                    
+                    // Network validation is now handled in the network detection above
+                    
+                    // Validate Aave Pool address before contract initialization
+                    if (!isValidAddress(AAVE_POOL_ADDRESS)) {
+                        throw new Error('Invalid Aave Pool address configuration');
+                    }
+                    aavePool = new ethers.Contract(AAVE_POOL_ADDRESS, AAVE_POOL_ABI, signer);
+                    
+                    const shortAddress = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
+                    document.getElementById('wallet-address-nav').textContent = shortAddress;
+                    document.getElementById('nav-connect-btn').style.display = 'none';
+                    document.getElementById('wallet-connected').style.display = 'flex';
+                    document.getElementById('connection-alert').style.display = 'none';
+                    
+                    await refreshLiquidationData();
+                    startAutoRefresh();
+                    showAlert('Wallet connected successfully!', 'success');
+                } else {
+                    showAlert('Please install MetaMask wallet', 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to connect wallet: ' + error.message, 'error');
+            }
+        }
+        
+        // Disconnect wallet
+        function disconnectWallet() {
+            userAddress = null;
+            provider = null;
+            signer = null;
+            aavePool = null;
+            
+            stopAutoRefresh();
+            
+            document.getElementById('nav-connect-btn').style.display = 'inline-block';
+            document.getElementById('wallet-connected').style.display = 'none';
+            document.getElementById('connection-alert').style.display = 'block';
+            
+            // Clear displayed data
+            document.getElementById('total-liquidatable').textContent = '0';
+            document.getElementById('total-liquidation-value').textContent = '$0';
+            document.getElementById('potential-bonus').textContent = '$0';
+            document.getElementById('avg-health-factor').textContent = '∞';
+            
+            const tableBody = document.getElementById('liquidation-table-body');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-8 text-gray-400">
+                        <i class="fas fa-search text-2xl mb-2"></i>
+                        <div>No liquidation opportunities found</div>
+                        <div class="text-xs mt-1">Connect wallet and refresh to scan for positions</div>
+                    </td>
+                </tr>
+            `;
+            
+            showAlert('Wallet disconnected successfully', 'success');
+        }
+        
+
+
+        // Check liquidation status for a specific address
+        async function checkAddressLiquidation(userAddress) {
+            if (!aavePool) {
+                throw new Error('Aave Pool contract not initialized');
+            }
+            
+            if (!ethers.utils.isAddress(userAddress)) {
+                throw new Error('Invalid Ethereum address');
+            }
+            
+            try {
+                // Get user account data from Aave pool
+                const accountData = await aavePool.getUserAccountData(userAddress);
+                
+                // Validate account data exists
+                if (!accountData) {
+                    throw new Error('No account data returned from Aave pool');
+                }
+                
+                let healthFactor;
+                if (!accountData.healthFactor || accountData.healthFactor.eq(ethers.constants.MaxUint256)) {
+                    healthFactor = Infinity;
+                } else {
+                    healthFactor = parseFloat(ethers.utils.formatUnits(accountData.healthFactor, 18));
+                }
+                
+                // Safely parse values with fallbacks
+                const totalCollateralETH = accountData.totalCollateralETH ? 
+                    parseFloat(ethers.utils.formatUnits(accountData.totalCollateralETH, 18)) : 0;
+                const totalDebtETH = accountData.totalDebtETH ? 
+                    parseFloat(ethers.utils.formatUnits(accountData.totalDebtETH, 18)) : 0;
+                const availableBorrowsETH = accountData.availableBorrowsETH ? 
+                    parseFloat(ethers.utils.formatUnits(accountData.availableBorrowsETH, 18)) : 0;
+                const currentLiquidationThreshold = accountData.currentLiquidationThreshold ? 
+                    parseFloat(accountData.currentLiquidationThreshold) / 10000 : 0; // Convert from basis points
+                const ltv = accountData.ltv ? 
+                    parseFloat(accountData.ltv) / 10000 : 0; // Convert from basis points
+                
+                // Calculate if position is liquidatable
+                const isLiquidatable = healthFactor < 1.0 && healthFactor !== Infinity;
+                
+                // Calculate max liquidation amount (50% of debt)
+                const maxLiquidationETH = totalDebtETH * 0.5;
+                const liquidationBonusETH = maxLiquidationETH * 0.05; // Approximate 5% bonus
+                
+                return {
+                    userAddress: userAddress,
+                    healthFactor: healthFactor,
+                    totalCollateralETH: totalCollateralETH,
+                    totalDebtETH: totalDebtETH,
+                    availableBorrowsETH: availableBorrowsETH,
+                    currentLiquidationThreshold: currentLiquidationThreshold,
+                    ltv: ltv,
+                    isLiquidatable: isLiquidatable,
+                    maxLiquidationETH: maxLiquidationETH,
+                    liquidationBonusETH: liquidationBonusETH
+                };
+                
+            } catch (error) {
+                console.error('Error checking address liquidation:', error);
+                throw error;
+            }
+        }
+        
+        // Get active users by scanning Aave Pool events
+        async function getActiveUsersFromEvents() {
+            const activeUsers = new Set();
+            
+            try {
+                // Get current block number
+                const currentBlock = await provider.getBlockNumber();
+                const fromBlock = Math.max(currentBlock - 2000, 0); // Scan last ~2000 blocks (~8 hours)
+                
+                console.log(`Scanning events from block ${fromBlock} to ${currentBlock}`);
+                
+                // Define event signatures for Aave Pool
+                const borrowEventSignature = ethers.utils.id('Borrow(address,address,address,uint256,uint8,uint256,uint16)');
+                const supplyEventSignature = ethers.utils.id('Supply(address,address,address,uint256,uint16)');
+                const withdrawEventSignature = ethers.utils.id('Withdraw(address,address,address,uint256)');
+                const repayEventSignature = ethers.utils.id('Repay(address,address,address,uint256,bool)');
+                
+                // Create filter for multiple event types
+                const filter = {
+                    address: aavePool.address,
+                    fromBlock: fromBlock,
+                    toBlock: currentBlock,
+                    topics: [
+                        [borrowEventSignature, supplyEventSignature, withdrawEventSignature, repayEventSignature]
+                    ]
+                };
+                
+                // Get logs
+                const logs = await provider.getLogs(filter);
+                console.log(`Found ${logs.length} relevant events`);
+                
+                // Parse logs to extract user addresses
+                for (const log of logs) {
+                    try {
+                        // For all these events, the user address is typically the first indexed parameter
+                        // which appears in topics[1]
+                        if (log.topics.length > 1) {
+                            const userAddress = ethers.utils.getAddress('0x' + log.topics[1].slice(26));
+                            activeUsers.add(userAddress);
+                        }
+                    } catch (error) {
+                        // Skip invalid addresses
+                        continue;
+                    }
+                }
+                
+                console.log(`Extracted ${activeUsers.size} unique active users`);
+                return activeUsers;
+                
+            } catch (error) {
+                console.error('Error scanning events:', error);
+                // Fallback: return empty set
+                return new Set();
+            }
+        }
+        
+        // Check liquidation status for a specific user (reused from checkAddressLiquidation)
+        async function checkUserLiquidationStatus(userAddress) {
+            try {
+                if (!ethers.utils.isAddress(userAddress)) {
+                    throw new Error('Invalid address format');
+                }
+                
+                // Get user account data from Aave pool
+                const accountData = await aavePool.getUserAccountData(userAddress);
+                
+                // Validate accountData exists
+                if (!accountData) {
+                    throw new Error('No account data returned');
+                }
+                
+                // Safely parse health factor
+                let healthFactor;
+                if (!accountData.healthFactor || accountData.healthFactor.eq(ethers.constants.MaxUint256)) {
+                    healthFactor = Infinity;
+                } else {
+                    healthFactor = parseFloat(ethers.utils.formatUnits(accountData.healthFactor, 18));
+                }
+                
+                // Safely parse other values with defaults
+                const totalCollateralETH = accountData.totalCollateralETH || ethers.BigNumber.from(0);
+                const totalDebtETH = accountData.totalDebtETH || ethers.BigNumber.from(0);
+                const availableBorrowsETH = accountData.availableBorrowsETH || ethers.BigNumber.from(0);
+                const currentLiquidationThreshold = accountData.currentLiquidationThreshold || ethers.BigNumber.from(0);
+                const ltv = accountData.ltv || ethers.BigNumber.from(0);
+                
+                // Calculate if position is liquidatable
+                const isLiquidatable = healthFactor < 1.0 && healthFactor !== Infinity && !totalDebtETH.isZero();
+                
+                // Calculate max liquidation amount (50% of debt)
+                const maxLiquidationETH = totalDebtETH.div(2);
+                const liquidationBonusETH = maxLiquidationETH.div(20); // Approximate 5% bonus
+                
+                return {
+                    userAddress: userAddress,
+                    healthFactor: healthFactor,
+                    totalCollateralETH: totalCollateralETH,
+                    totalDebtETH: totalDebtETH,
+                    availableBorrowsETH: availableBorrowsETH,
+                    currentLiquidationThreshold: currentLiquidationThreshold,
+                    ltv: ltv,
+                    isLiquidatable: isLiquidatable,
+                    maxLiquidationETH: maxLiquidationETH,
+                    liquidationBonusETH: liquidationBonusETH
+                };
+                
+            } catch (error) {
+                console.error(`Error checking user liquidation status for ${userAddress}:`, error);
+                throw error;
+            }
+        }
+        
+        // Generate real liquidation opportunities using Web3 native interfaces
+        async function generateLiquidationData() {
+            if (!aavePool || !provider) {
+                throw new Error('Aave Pool contract or provider not initialized');
+            }
+            
+            try {
+                console.log('Fetching liquidation data using Web3 native interfaces...');
+                showAlert('Scanning blockchain for liquidation opportunities...', 'info');
+                
+                // Get recent active users by scanning Borrow and Supply events
+                const activeUsers = await getActiveUsersFromEvents();
+                console.log(`Found ${activeUsers.size} active users`);
+                
+                if (activeUsers.size === 0) {
+                    showAlert('No recent activity found. Try expanding the search range.', 'warning');
+                    return [];
+                }
+                
+                // Batch query user account data
+                const liquidationOpportunities = [];
+                const userArray = Array.from(activeUsers);
+                const batchSize = 10; // Process in batches to avoid rate limits
+                
+                for (let i = 0; i < userArray.length; i += batchSize) {
+                    const batch = userArray.slice(i, i + batchSize);
+                    const batchPromises = batch.map(async (userAddress) => {
+                        try {
+                            return await checkUserLiquidationStatus(userAddress);
+                        } catch (error) {
+                            console.warn(`Failed to check user ${userAddress}:`, error.message);
+                            return null;
+                        }
+                    });
+                    
+                    const batchResults = await Promise.all(batchPromises);
+                    
+                    // Filter and add valid liquidation opportunities
+                    for (const result of batchResults) {
+                        if (result && result.isLiquidatable) {
+                            liquidationOpportunities.push({
+                                userAddress: result.userAddress,
+                                healthFactor: result.healthFactor,
+                                collateralAsset: 'Mixed', // We'll show mixed for now
+                                collateralAmount: (result.totalCollateralETH / 1e18).toFixed(4),
+                                collateralValue: Math.round(result.totalCollateralETH / 1e18),
+                                debtAsset: 'Mixed',
+                                debtAmount: (result.totalDebtETH / 1e18).toFixed(4),
+                                debtValue: Math.round(result.totalDebtETH / 1e18),
+                                maxLiquidation: Math.round(result.maxLiquidationETH / 1e18),
+                                liquidationBonus: Math.round(result.liquidationBonusETH / 1e18)
+                            });
+                        }
+                    }
+                    
+                    // Add small delay between batches
+                    if (i + batchSize < userArray.length) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                }
+                
+                console.log(`Found ${liquidationOpportunities.length} liquidation opportunities`);
+                
+                if (liquidationOpportunities.length === 0) {
+                    showAlert('No liquidation opportunities found in recent activity.', 'info');
+                } else {
+                    showAlert(`Found ${liquidationOpportunities.length} liquidation opportunities!`, 'success');
+                }
+                
+                return liquidationOpportunities;
+                
+            } catch (error) {
+                console.error('Error fetching liquidation data:', error);
+                showAlert(`Error scanning for liquidation opportunities: ${error.message}`, 'error');
+                return [];
+            }
+        }
+        
+        // Refresh liquidation data
+        async function refreshLiquidationData() {
+            if (!userAddress || !aavePool) {
+                showAlert('Please connect your wallet first', 'error');
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                
+                // Get real liquidation opportunities with health factor validation
+                const liquidationOpportunities = await generateLiquidationData();
+                
+                updateLiquidationTable(liquidationOpportunities);
+                updateStats(liquidationOpportunities);
+                
+                // Update last refresh time
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                document.getElementById('last-refresh-time').textContent = timeString;
+                
+                if (liquidationOpportunities.length === 0) {
+                    showAlert('No liquidatable positions found at this time', 'info');
+                } else {
+                    showAlert(`Found ${liquidationOpportunities.length} liquidatable position(s)`, 'success');
+                }
+                
+            } catch (error) {
+                showAlert('Failed to refresh liquidation data: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Update liquidation table
+        function updateLiquidationTable(positions) {
+            const tableBody = document.getElementById('liquidation-table-body');
+            
+            // Apply health factor filter to table display
+            const healthFactorThreshold = parseFloat(document.getElementById('health-factor-filter').value) || 1.0;
+            const filteredPositions = positions.filter(p => p.healthFactor <= healthFactorThreshold);
+            
+            if (filteredPositions.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-8 text-gray-400">
+                            <i class="fas fa-check-circle text-2xl mb-2 text-green-400"></i>
+                            <div>No liquidation opportunities found</div>
+                            <div class="text-xs mt-1">All positions are healthy</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tableBody.innerHTML = filteredPositions.map(position => {
+                const healthFactorClass = position.healthFactor < 0.8 ? 'health-factor-critical' : 
+                                        position.healthFactor < 1.0 ? 'health-factor-warning' : 'health-factor-safe';
+                
+                // Handle both old and new data structures
+                const userAddress = position.userAddress || position.user;
+                const collateralAsset = position.collateralAsset || position.collateral?.asset;
+                const collateralAmount = position.collateralAmount || position.collateral?.amount;
+                const collateralValue = position.collateralValue || position.collateral?.value;
+                const debtAsset = position.debtAsset || position.debt?.asset;
+                const debtAmount = position.debtAmount || position.debt?.amount;
+                const debtValue = position.debtValue || position.debt?.value;
+                const liquidationBonus = position.liquidationBonus || position.bonus;
+                
+                const shortAddress = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
+                
+                return `
+                    <tr class="border-b border-gray-700 hover:bg-gray-800/50 transition-colors">
+                        <td class="py-4 px-4">
+                            <div class="font-mono text-sm">${shortAddress}</div>
+                            <div class="text-xs text-gray-400">User Position</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="font-bold ${healthFactorClass}">${position.healthFactor.toFixed(3)}</div>
+                            <div class="text-xs text-gray-400">Risk Level</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="font-semibold">${collateralAmount} ${collateralAsset}</div>
+                            <div class="text-xs text-gray-400">$${collateralValue.toLocaleString()}</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="font-semibold">${debtAmount.toLocaleString()} ${debtAsset}</div>
+                            <div class="text-xs text-gray-400">$${debtValue.toLocaleString()}</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="font-semibold text-yellow-400">$${position.maxLiquidation.toLocaleString()}</div>
+                            <div class="text-xs text-gray-400">50% of debt</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="font-semibold text-green-400">$${liquidationBonus}</div>
+                            <div class="text-xs text-gray-400">~5% bonus</div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <button onclick="liquidatePosition('${userAddress}', '${debtAsset}', '${collateralAsset}', ${position.maxLiquidation})" 
+                                    class="liquidation-danger hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-red-500/20 text-sm">
+                                <i class="fas fa-gavel mr-1"></i>Liquidate
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Update stats
+        function updateStats(positions) {
+            // Get user-defined health factor threshold
+            const healthFactorThreshold = parseFloat(document.getElementById('health-factor-filter').value) || 1.0;
+            
+            const liquidatablePositions = positions.filter(p => p.healthFactor <= healthFactorThreshold);
+            const totalValue = liquidatablePositions.reduce((sum, p) => sum + p.maxLiquidation, 0);
+            const totalBonus = liquidatablePositions.reduce((sum, p) => {
+                const bonus = p.bonus || p.liquidationBonus || 0;
+                return sum + (typeof bonus === 'number' ? bonus : 0);
+            }, 0);
+            const avgHealthFactor = positions.length > 0 ? 
+                positions.reduce((sum, p) => sum + p.healthFactor, 0) / positions.length : 0;
+            
+            document.getElementById('total-liquidatable').textContent = liquidatablePositions.length;
+            document.getElementById('total-liquidation-value').textContent = '$' + totalValue.toLocaleString();
+            document.getElementById('potential-bonus').textContent = '$' + totalBonus.toLocaleString();
+            document.getElementById('avg-health-factor').textContent = avgHealthFactor > 0 ? avgHealthFactor.toFixed(3) : '∞';
+        }
+        
+        // Liquidate position with enhanced validation
+        async function liquidatePosition(userAddress, debtAsset, collateralAsset, maxLiquidation) {
+            try {
+                showLoading(true);
+                
+                // First, verify the position is still liquidatable with detailed checks
+                showAlert('Validating liquidation opportunity...', 'info');
+                const accountData = await aavePool.getUserAccountData(userAddress);
+                
+                // Handle health factor properly - check for max uint256 (indicates no debt/infinite health)
+                let healthFactor;
+                if (accountData.healthFactor.eq(ethers.constants.MaxUint256)) {
+                    healthFactor = Infinity; // No debt, infinite health factor
+                } else {
+                    healthFactor = parseFloat(ethers.utils.formatUnits(accountData.healthFactor, 18));
+                }
+                
+                // Validate and ensure proper address checksum (no ENS resolution)
+                if (!isValidAddress(userAddress)) {
+                    throw new Error(`Invalid user address format: ${userAddress}`);
+                }
+                userAddress = toChecksumAddress(userAddress);
+                
+                // Enhanced health factor validation
+                if (healthFactor === Infinity) {
+                    throw new Error('Position is not liquidatable. Health Factor: ∞ (no debt)');
+                } else if (healthFactor >= 1.0) {
+                    throw new Error(`Position is not liquidatable. Health Factor: ${healthFactor.toFixed(6)} (must be < 1.0)`);
+                }
+                
+                // Check if position has sufficient debt
+                if (accountData.totalDebtBase.eq(0)) {
+                    throw new Error('Position has no debt to liquidate');
+                }
+                
+                // Check if position has sufficient collateral
+                if (accountData.totalCollateralBase.eq(0)) {
+                    throw new Error('Position has no collateral available for liquidation');
+                }
+                
+                showAlert(`Position validated - Health Factor: ${healthFactor.toFixed(6)}`, 'success');
+                
+                // Get asset configurations
+                const debtAssetConfig = Object.values(ASSETS).find(a => a.symbol === debtAsset);
+                const collateralAssetConfig = Object.values(ASSETS).find(a => a.symbol === collateralAsset);
+                
+                // Validate asset addresses
+                if (!isValidAddress(debtAssetConfig?.address)) {
+                    throw new Error(`Invalid debt asset address: ${debtAssetConfig?.address}`);
+                }
+                if (!isValidAddress(collateralAssetConfig?.address)) {
+                    throw new Error(`Invalid collateral asset address: ${collateralAssetConfig?.address}`);
+                }
+                
+                if (!debtAssetConfig || !collateralAssetConfig) {
+                    throw new Error('Asset configuration not found');
+                }
+                
+                // Calculate liquidation amount (use actual debt amount, max 50%)
+                const totalDebtBase = accountData.totalDebtBase;
+                const maxLiquidationAmount = totalDebtBase.div(2); // 50% of total debt
+                
+                // Convert to debt asset units
+                const liquidationAmountInAsset = ethers.utils.parseUnits(
+                    Math.min(maxLiquidation * 0.5, 1000).toString(), // Cap at reasonable amount
+                    debtAssetConfig.decimals
+                );
+                
+                // Check if liquidator has enough balance
+                const debtTokenContract = new ethers.Contract(debtAssetConfig.address, ERC20_ABI, signer);
+                
+                // Use cached userAddress instead of calling signer.getAddress() to avoid ENS resolution
+                if (!userAddress) {
+                    throw new Error('Wallet not connected');
+                }
+                
+                // Validate liquidator address
+                if (!isValidAddress(userAddress)) {
+                    throw new Error('Invalid liquidator address');
+                }
+                
+                const liquidatorAddress = userAddress;
+                
+                const liquidatorBalance = await debtTokenContract.balanceOf(liquidatorAddress);
+                
+                if (liquidatorBalance.lt(liquidationAmountInAsset)) {
+                    throw new Error(`Insufficient ${debtAsset} balance for liquidation. Required: ${ethers.utils.formatUnits(liquidationAmountInAsset, debtAssetConfig.decimals)}, Available: ${ethers.utils.formatUnits(liquidatorBalance, debtAssetConfig.decimals)}`);
+                }
+                
+                // Check allowance
+                const allowance = await debtTokenContract.allowance(liquidatorAddress, AAVE_POOL_ADDRESS);
+                if (allowance.lt(liquidationAmountInAsset)) {
+                    showAlert(`Approving ${debtAsset} spending...`, 'info');
+                    const approveTx = await debtTokenContract.approve(AAVE_POOL_ADDRESS, liquidationAmountInAsset);
+                    await approveTx.wait();
+                    showAlert(`${debtAsset} spending approved`, 'success');
+                }
+                
+                // Execute liquidation with manual gas limit
+                showAlert('Executing liquidation...', 'info');
+                const liquidationTx = await aavePool.liquidationCall(
+                    collateralAssetConfig.address,
+                    debtAssetConfig.address,
+                    userAddress,
+                    liquidationAmountInAsset,
+                    false, // Receive underlying asset, not aToken
+                    {
+                        gasLimit: 500000 // Manual gas limit to avoid estimation issues
+                    }
+                );
+                
+                await liquidationTx.wait();
+                
+                showAlert(`Liquidation successful! Transaction: ${liquidationTx.hash}`, 'success');
+                await refreshLiquidationData();
+                
+            } catch (error) {
+                console.error('Liquidation error:', error);
+                let errorMessage = 'Liquidation failed: ';
+                
+                if (error.message.includes('execution reverted: 45')) {
+                    errorMessage += 'Position is not liquidatable (Health Factor >= 1.0 or insufficient collateral)';
+                } else if (error.message.includes('execution reverted: 51')) {
+                    errorMessage += 'Position is not liquidatable (Health Factor >= 1.0)';
+                } else if (error.message.includes('execution reverted: 52')) {
+                    errorMessage += 'Invalid liquidation parameters';
+                } else if (error.message.includes('UNPREDICTABLE_GAS_LIMIT')) {
+                    errorMessage += 'Gas estimation failed - position may not be liquidatable or network congestion';
+                } else if (error.message.includes('User denied transaction')) {
+                    errorMessage += 'Transaction was cancelled by user';
+                } else if (error.message.includes('Health Factor:')) {
+                    errorMessage += error.message; // Custom health factor message
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showAlert(errorMessage, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Auto refresh functionality
+        function startAutoRefresh() {
+            const autoRefreshCheckbox = document.getElementById('auto-refresh');
+            const refreshIntervalSelect = document.getElementById('refresh-interval');
+            
+            // Stop any existing interval first
+            stopAutoRefresh();
+            
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                const intervalSeconds = parseInt(refreshIntervalSelect.value) || 5;
+                autoRefreshInterval = setInterval(refreshLiquidationData, intervalSeconds * 1000);
+                console.log(`Auto refresh started with ${intervalSeconds}s interval`);
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                console.log('Auto refresh stopped');
+            }
+        }
+        
+        // Show alert
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            
+            let bgColor, textColor, icon;
+            switch (type) {
+                case 'success':
+                    bgColor = 'bg-green-500/20';
+                    textColor = 'text-green-400';
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-500/20';
+                    textColor = 'text-red-400';
+                    icon = 'fas fa-exclamation-circle';
+                    break;
+                case 'info':
+                    bgColor = 'bg-blue-500/20';
+                    textColor = 'text-blue-400';
+                    icon = 'fas fa-info-circle';
+                    break;
+                default:
+                    bgColor = 'bg-gray-500/20';
+                    textColor = 'text-gray-400';
+                    icon = 'fas fa-bell';
+            }
+            
+            // Add timestamp
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('zh-CN', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            alertDiv.className = `${bgColor} border border-gray-600 rounded-lg p-3 flex flex-col space-y-2 animate-fade-in`;
+            alertDiv.innerHTML = `
+                <div class="flex items-start space-x-2">
+                    <i class="${icon} ${textColor} text-sm mt-0.5 flex-shrink-0"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="${textColor} text-sm break-words">${message}</div>
+                        <div class="text-gray-500 text-xs mt-1">${timeString}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Insert at the top
+            alertsContainer.insertBefore(alertDiv, alertsContainer.firstChild);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.style.opacity = '0';
+                    alertDiv.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) {
+                            alertDiv.parentNode.removeChild(alertDiv);
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Limit to 10 alerts maximum
+            const alerts = alertsContainer.children;
+            if (alerts.length > 10) {
+                for (let i = 10; i < alerts.length; i++) {
+                    alerts[i].remove();
+                }
+            }
+        }
+        
+        // Show/hide loading
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.remove('hidden');
+            } else {
+                loading.classList.add('hidden');
+            }
+        }
+        
+        // Show address check result
+        function showAddressCheckResult(result) {
+            const resultsContainer = document.getElementById('address-check-results');
+            
+            // Clear previous results
+            resultsContainer.innerHTML = '';
+            
+            const resultDiv = document.createElement('div');
+            
+            const healthFactorColor = result.healthFactor === Infinity ? 'text-green-400' : 
+                                    result.healthFactor >= 1.5 ? 'text-green-400' :
+                                    result.healthFactor >= 1.1 ? 'text-yellow-400' :
+                                    result.healthFactor >= 1.0 ? 'text-orange-400' : 'text-red-400';
+            
+            const statusColor = result.isLiquidatable ? 'text-red-400' : 'text-green-400';
+            const statusText = result.isLiquidatable ? 'LIQUIDATABLE' : 'SAFE';
+            const statusIcon = result.isLiquidatable ? 'fas fa-exclamation-triangle' : 'fas fa-shield-alt';
+            
+            resultDiv.className = 'glass-card rounded-2xl p-8';
+            resultDiv.innerHTML = `
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-white flex items-center">
+                        <i class="fas fa-user mr-3"></i>
+                        Address Check Result
+                    </h3>
+                    <div class="flex items-center ${statusColor}">
+                        <i class="${statusIcon} mr-2"></i>
+                        <span class="font-bold text-lg">${statusText}</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Address:</span>
+                            <span class="text-white font-mono text-xs">${result.userAddress.slice(0, 6)}...${result.userAddress.slice(-4)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Health Factor:</span>
+                            <span class="${healthFactorColor} font-bold">
+                                ${result.healthFactor === Infinity ? '∞' : result.healthFactor.toFixed(3)}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Collateral:</span>
+                            <span class="text-white">${result.totalCollateralETH.toFixed(4)} ETH</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Debt:</span>
+                            <span class="text-white">${result.totalDebtETH.toFixed(4)} ETH</span>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Available Borrows:</span>
+                            <span class="text-white">${result.availableBorrowsETH.toFixed(4)} ETH</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Liquidation Threshold:</span>
+                            <span class="text-white">${(result.currentLiquidationThreshold * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">LTV:</span>
+                            <span class="text-white">${(result.ltv * 100).toFixed(1)}%</span>
+                        </div>
+                        ${result.isLiquidatable ? `
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Max Liquidation:</span>
+                            <span class="text-red-400 font-bold">${result.maxLiquidationETH.toFixed(4)} ETH</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Potential Bonus:</span>
+                            <span class="text-green-400 font-bold">${result.liquidationBonusETH.toFixed(4)} ETH</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <button onclick="this.parentElement.remove()" class="mt-4 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-xs transition-colors">
+                    <i class="fas fa-times mr-1"></i>Close
+                </button>
+            `;
+            
+            resultsContainer.appendChild(resultDiv);
+            
+            // Scroll to results
+            resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            // Setup auto refresh toggle and interval change
+            const autoRefreshCheckbox = document.getElementById('auto-refresh');
+            const refreshIntervalSelect = document.getElementById('refresh-interval');
+            
+            if (autoRefreshCheckbox) {
+                autoRefreshCheckbox.addEventListener('change', (e) => {
+                    console.log('Auto refresh checkbox changed:', e.target.checked);
+                    if (e.target.checked) {
+                        startAutoRefresh();
+                    } else {
+                        stopAutoRefresh();
+                    }
+                });
+            }
+            
+            if (refreshIntervalSelect) {
+                refreshIntervalSelect.addEventListener('change', (e) => {
+                    console.log('Refresh interval changed:', e.target.value);
+                    // Always restart auto refresh if it's currently enabled
+                    if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                        startAutoRefresh(); // startAutoRefresh now handles stopping existing interval
+                    }
+                });
+            }
+            
+            // Setup health factor filter change listener
+            const healthFactorFilter = document.getElementById('health-factor-filter');
+            if (healthFactorFilter) {
+                healthFactorFilter.addEventListener('input', () => {
+                    // Re-calculate stats with new health factor threshold
+                    if (userAddress && aavePool) {
+                        refreshLiquidationData();
+                    }
+                });
+            }
+            
+            // Setup address check button listener
+            const checkAddressBtn = document.getElementById('check-address-btn');
+            const addressInput = document.getElementById('address-input');
+            if (checkAddressBtn && addressInput) {
+                checkAddressBtn.addEventListener('click', async () => {
+                    const address = addressInput.value.trim();
+                    if (!address) {
+                        showAlert('Please enter a wallet address', 'error');
+                        return;
+                    }
+                    
+                    if (!aavePool) {
+                        showAlert('Please connect your wallet first', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        showLoading(true);
+                        const result = await checkAddressLiquidation(address);
+                        showAddressCheckResult(result);
+                    } catch (error) {
+                        showAlert(`Error checking address: ${error.message}`, 'error');
+                    } finally {
+                        showLoading(false);
+                    }
+                });
+                
+                // Allow Enter key to trigger check
+                addressInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        checkAddressBtn.click();
+                    }
+                });
+            }
+            
+            // Auto-start refresh if checkbox is checked
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                startAutoRefresh();
+            }
+            
+            // Add network switcher event listener
+            const networkSwitcher = document.getElementById('network-switcher');
+            if (networkSwitcher) {
+                networkSwitcher.addEventListener('change', onNetworkChange);
+            }
+            
+            if (typeof window.ethereum !== 'undefined') {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    await connectWallet();
+                }
+            }
+        });
+        
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else {
+                    connectWallet();
+                }
+            });
+            
+            window.ethereum.on('chainChanged', async (chainId) => {
+                // Find the network key for the new chain ID
+                const networkKey = Object.keys(NETWORKS).find(key => 
+                    NETWORKS[key].chainId === chainId
+                );
+                
+                if (networkKey) {
+                    // Update current network
+                    currentNetwork = networkKey;
+                    
+                    // Update network selector
+                        const networkSelect = document.getElementById('network-switcher');
+                        if (networkSelect) {
+                            networkSelect.value = networkKey;
+                        }
+                    
+                    // Update contract addresses
+                    const config = getCurrentNetworkConfig();
+                    AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                    
+                    // Reconnect wallet if connected
+                    if (userAddress) {
+                        await connectWallet();
+                    }
+                    
+                    showAlert(`Switched to ${NETWORKS[networkKey].chainName}`, 'success');
+                } else {
+                    showAlert('Unsupported network. Please switch to a supported network.', 'error');
+                    disconnectWallet();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

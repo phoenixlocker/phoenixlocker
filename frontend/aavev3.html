@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aave V3 Protocol | DeFi Lending & Borrowing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        }
+        .aave-animation {
+            animation: aave-pulse 3s ease-in-out infinite alternate;
+        }
+        @keyframes aave-pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+        .spinner {
+            border: 4px solid #374151;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .glass-card {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        }
+        .aave-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .liquidation-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen" style="transform: scale(0.75); transform-origin: top left; width: 133.33%; height: 133.33%;">
+    <!-- Navigation -->
+    <nav class="py-6 px-4 sm:px-12 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <i class="fas fa-coins text-2xl text-purple-500 aave-animation"></i>
+            <span class="text-xl font-bold bg-clip-text text-transparent gradient-bg">Aave V3 Protocol</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <a href="app.html" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-orange-500/20">
+                <i class="fas fa-fire mr-2"></i>PhoenixLocker
+            </a>
+            <a href="aavev3-liquidation.html" class="liquidation-danger hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-red-500/20">
+                <i class="fas fa-gavel mr-2"></i>Liquidation
+            </a>
+            
+            <!-- Network Switcher -->
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-400">Network:</span>
+                <select id="network-switcher" class="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 transition-colors">
+                    <option value="mainnet" selected>Ethereum Mainnet</option>
+                    <option value="sepolia">Sepolia Testnet</option>
+                    <option value="polygon">Polygon</option>
+                    <option value="arbitrum">Arbitrum</option>
+                    <option value="optimism">Optimism</option>
+                    <option value="bsc">BNB Smart Chain</option>
+                </select>
+            </div>
+            
+            <div id="wallet-status" class="text-sm">
+                <button onclick="connectWallet()" id="nav-connect-btn" class="aave-gradient hover:opacity-90 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-purple-500/20">
+                    Connect Wallet
+                </button>
+                <div id="wallet-connected" class="flex items-center space-x-3" style="display: none;">
+                    <span id="wallet-address-nav" class="text-gray-300 font-mono bg-gray-800 px-3 py-2 rounded-lg"></span>
+                    <button onclick="disconnectWallet()" id="nav-disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105">
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="min-h-screen flex flex-col">
+        <main class="flex-grow">
+            <div class="container mx-auto px-4 py-8 max-w-6xl">
+
+                <!-- Connection Alert -->
+                <div id="connection-alert" class="text-center py-12 mb-8">
+                    <div class="max-w-md mx-auto">
+                        <div class="mb-6">
+                            <i class="fas fa-wallet text-4xl text-purple-500 mb-4"></i>
+                            <h2 class="text-2xl font-bold mb-2">Connect Your Wallet</h2>
+                            <p class="text-gray-400">Connect your MetaMask wallet to start using Aave V3 Protocol</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="hidden text-center py-8">
+                    <div class="spinner mb-4"></div>
+                    <p class="text-gray-300">Processing...</p>
+                </div>
+
+                <!-- Alerts Container -->
+                <div id="alerts" class="mb-6"></div>
+
+                <!-- Hero Stats Section -->
+                <div class="text-center mb-12">
+                    <h1 class="text-3xl md:text-4xl font-bold mb-4">
+                        <span class="bg-clip-text text-transparent gradient-bg">Aave V3 Lending Dashboard</span>
+                    </h1>
+                    <p class="text-gray-400 mb-8 max-w-2xl mx-auto">Supply assets to earn interest with Aave V3 Protocol</p>
+                    
+                    <!-- Asset Selector -->
+                    <div class="mb-8">
+                        <div class="glass-card rounded-2xl p-6 max-w-md mx-auto">
+                            <select id="asset-selector" class="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-xl text-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all">
+                                <!-- Options will be populated dynamically based on current network -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Key Stats -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-green-400" id="supplied-balance">0</div>
+                            <div class="text-gray-400 text-sm mt-1">Supplied</div>
+                            <div class="text-gray-500 text-xs" id="supplied-asset-symbol">USDT</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-blue-400" id="earned-interest">0</div>
+                            <div class="text-gray-400 text-sm mt-1">Interest Earned</div>
+                            <div class="text-gray-500 text-xs" id="interest-asset-symbol">USDT</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-yellow-400"><span id="wallet-balance-amount" class="text-lg">0.00</span> <span id="wallet-asset-symbol" class="text-sm text-yellow-300">USDT</span></div>
+                            <div class="text-gray-400 text-sm mt-1">Wallet Balance</div>
+                            <div class="text-gray-500 text-xs">Available</div>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6 text-center hover:glow-effect transition-all duration-300">
+                            <div class="text-2xl font-bold text-purple-400" id="apy-rate">0%</div>
+                            <div class="text-gray-400 text-sm mt-1">Supply APY</div>
+                            <div class="text-gray-500 text-xs">Current Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Cards -->
+                <div class="max-w-4xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                        <!-- Supply Card -->
+                        <div class="glass-card rounded-2xl p-8 hover:glow-effect transition-all duration-300">
+                            <div class="text-center mb-6">
+                                <div class="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-arrow-up text-2xl text-purple-500"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold mb-2">Supply Assets</h3>
+                                <p class="text-gray-400 text-sm">Supply assets to earn interest</p>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="supply-amount" class="block text-sm font-medium text-gray-300 mb-2">Amount (USDT)</label>
+                                    <input type="number" id="supply-amount" placeholder="0.00" step="0.000001" 
+                                           class="w-full px-4 py-4 bg-gray-800/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all text-center text-lg font-mono">
+                                </div>
+                                <button onclick="supplyAsset()" id="supply-btn" 
+                                        class="w-full aave-gradient hover:opacity-90 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-purple-500/20">
+                                    <i class="fas fa-plus mr-2"></i>Supply Now
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Withdraw Card -->
+                        <div class="glass-card rounded-2xl p-8 hover:glow-effect transition-all duration-300">
+                            <div class="text-center mb-6">
+                                <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-arrow-down text-2xl text-green-500"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold mb-2">Withdraw Assets</h3>
+                                <p class="text-gray-400 text-sm">Withdraw your supplied assets and earned interest</p>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="withdraw-amount" class="block text-sm font-medium text-gray-300 mb-2">Amount (USDT)</label>
+                                    <input type="number" id="withdraw-amount" placeholder="0.00" step="0.000001" 
+                                           class="w-full px-4 py-4 bg-gray-800/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all text-center text-lg font-mono">
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="withdrawAsset()" id="withdraw-btn" 
+                                            class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-green-500/20">
+                                        <i class="fas fa-minus mr-2"></i>Withdraw
+                                    </button>
+                                    <button onclick="withdrawMax()" id="withdraw-max-btn" 
+                                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-4 rounded-xl transition-all transform hover:scale-105 shadow-lg shadow-blue-500/20">
+                                        Max
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-8 px-4 sm:px-12 border-t border-gray-800/50 mt-12">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center space-x-2 mb-4 md:mb-0">
+                        <i class="fas fa-coins text-xl text-purple-500 aave-animation"></i>
+                        <span class="text-lg font-bold bg-clip-text text-transparent gradient-bg">Aave V3 Protocol</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="https://aave.com" target="_blank" class="text-gray-400 hover:text-purple-500 transition-colors">
+                            <i class="fas fa-external-link-alt text-xl"></i>
+                            <span class="ml-2">Official Site</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="mt-6 text-center text-gray-500 text-sm">
+                    © 2023 Aave V3 Protocol Interface. Powered by Aave and PhoenixLocker.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Contract addresses (dynamic based on network)
+        let AAVE_POOL_ADDRESS; // Will be initialized after network configuration
+        
+        // Asset configurations by network
+        const NETWORK_ASSETS = {
+            mainnet: {
+                USDT: {
+                    symbol: 'USDT',
+                    name: 'Tether USD',
+                    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                    aTokenAddress: '0x23878914EFE38d27C4D67Ab83ed1b93A74D4086a',
+                    decimals: 6
+                },
+                USDC: {
+                    symbol: 'USDC',
+                    name: 'USD Coin',
+                    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+                    aTokenAddress: '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c',
+                    decimals: 6
+                },
+                WBTC: {
+                    symbol: 'WBTC',
+                    name: 'Wrapped Bitcoin',
+                    address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+                    aTokenAddress: '0x5Ee5bf7ae06D1Be5997A1A72006FE6C607eC6DE8',
+                    decimals: 8
+                },
+                WETH: {
+                    symbol: 'WETH',
+                    name: 'Wrapped Ethereum',
+                    address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+                    aTokenAddress: '0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8',
+                    decimals: 18
+                },
+                LINK: {
+                    symbol: 'LINK',
+                    name: 'ChainLink Token',
+                    address: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+                    aTokenAddress: '0x5E8C8A7243651DB1384C0dDfDbE39761E8e7E51a',
+                    decimals: 18
+                },
+                AAVE: {
+                    symbol: 'AAVE',
+                    name: 'Aave Token',
+                    address: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9',
+                    aTokenAddress: '0xA700b4eB416Be35b2911fd5Dee80678ff64fF6C9',
+                    decimals: 18
+                },
+                ETH: {
+                    symbol: 'ETH',
+                    name: 'Ethereum',
+                    address: '0x0000000000000000000000000000000000000000',
+                    aTokenAddress: '0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8',
+                    decimals: 18
+                }
+            },
+            sepolia: {
+                USDT: {
+                    symbol: 'USDT',
+                    name: 'Tether USD',
+                    address: '0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0',
+                    aTokenAddress: '0x6c23b444d1522136b99f56c22505507d3ae3012a',
+                    decimals: 6
+                },
+                USDC: {
+                    symbol: 'USDC',
+                    name: 'USD Coin',
+                    address: '0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8',
+                    aTokenAddress: '0x16dA4541aD1807f4443d92D26044C1147406EB80',
+                    decimals: 6
+                },
+                WBTC: {
+                    symbol: 'WBTC',
+                    name: 'Wrapped Bitcoin',
+                    address: '0x29f2D40B0605204364af54EC677bD022dA425d03',
+                    aTokenAddress: '0x1804bf30507dc2eb3bdebbbdd859991eaef6eeff',
+                    decimals: 8
+                },
+                WETH: {
+                    symbol: 'WETH',
+                    name: 'Wrapped Ethereum',
+                    address: '0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c',
+                    aTokenAddress: '0x5b071b590a59395fE4025A0Ccc1FcC931AAc1830',
+                    decimals: 18
+                },
+                LINK: {
+                    symbol: 'LINK',
+                    name: 'ChainLink Token',
+                    address: '0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5',
+                    aTokenAddress: '0x3FfAf50D4F4E96eB78f2407c090b72e86eCaed24',
+                    decimals: 18
+                },
+                AAVE: {
+                    symbol: 'AAVE',
+                    name: 'Aave Token',
+                    address: '0x88541670E55cC00bEEFD87eB59EDd1b7C511AC9a',
+                    aTokenAddress: '0x1Ee669290939f8a8864497Af3BC83728715265FF',
+                    decimals: 18
+                },
+                ETH: {
+                    symbol: 'ETH',
+                    name: 'Ethereum',
+                    address: '0x0000000000000000000000000000000000000000',
+                    aTokenAddress: '0x5b071b590a59395fE4025A0Ccc1FcC931AAc1830',
+                    decimals: 18
+                }
+            }
+        };
+        
+        // Current selected asset
+        let currentAsset = 'USDT'; // Sepolia aEthUSDT token
+        
+        // Simplified ABIs
+        const AAVE_POOL_ABI = [
+            'function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external',
+            'function withdraw(address asset, uint256 amount, address to) external returns (uint256)',
+            'function getUserAccountData(address user) external view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)',
+            'function getReserveData(address asset) external view returns (uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt)'
+        ];
+        
+        const ERC20_ABI = [
+            'function balanceOf(address owner) external view returns (uint256)',
+            'function approve(address spender, uint256 amount) external returns (bool)',
+            'function allowance(address owner, address spender) external view returns (uint256)',
+            'function decimals() external view returns (uint8)',
+            'function transfer(address to, uint256 amount) external returns (bool)'
+        ];
+        
+        let provider, signer, aavePool, assetContract, aTokenContract, userAddress;
+        let isConnected = false;
+        
+        // Get current asset configuration based on network
+        function getCurrentAssetConfig() {
+            const networkAssets = NETWORK_ASSETS[currentNetwork];
+            if (!networkAssets || !networkAssets[currentAsset]) {
+                console.warn(`Asset ${currentAsset} not found for network ${currentNetwork}`);
+                return null;
+            }
+            return networkAssets[currentAsset];
+        }
+        
+        // Get all available assets for current network
+        function getAvailableAssets() {
+            return NETWORK_ASSETS[currentNetwork] || {};
+        }
+        
+        // Update asset selector based on current network
+        function updateAssetSelector() {
+            const assetSelector = document.getElementById('asset-selector');
+            if (!assetSelector) return;
+            
+            const availableAssets = getAvailableAssets();
+            const currentValue = assetSelector.value;
+            
+            // Clear existing options
+            assetSelector.innerHTML = '';
+            
+            // Add options for available assets
+            Object.keys(availableAssets).forEach(symbol => {
+                const asset = availableAssets[symbol];
+                const option = document.createElement('option');
+                option.value = symbol;
+                option.textContent = `${symbol} - ${asset.name}`;
+                assetSelector.appendChild(option);
+            });
+            
+            // Restore previous selection if still available, otherwise select first option
+            if (availableAssets[currentValue]) {
+                assetSelector.value = currentValue;
+            } else if (Object.keys(availableAssets).length > 0) {
+                assetSelector.value = Object.keys(availableAssets)[0];
+                currentAsset = Object.keys(availableAssets)[0];
+            }
+        }
+        
+        // Initialize contracts for current asset
+        function initializeContracts() {
+            if (!provider || !signer) return;
+            
+            // Check if Aave V3 is available on current network
+            if (!AAVE_POOL_ADDRESS) {
+                console.log('Aave V3 not available on current network, skipping contract initialization');
+                return;
+            }
+            
+            const assetConfig = getCurrentAssetConfig();
+            if (!assetConfig) {
+                console.error('No asset configuration found for current network and asset');
+                return;
+            }
+            
+            aavePool = new ethers.Contract(AAVE_POOL_ADDRESS, AAVE_POOL_ABI, signer);
+            assetContract = new ethers.Contract(assetConfig.address, ERC20_ABI, signer);
+            aTokenContract = new ethers.Contract(assetConfig.aTokenAddress, ERC20_ABI, signer);
+        }
+        
+        // Network configurations
+        const NETWORKS = {
+            mainnet: {
+                chainId: '0x1',
+                chainName: 'Ethereum Mainnet',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.infura.io/v3/'],
+                blockExplorerUrls: ['https://etherscan.io/'],
+                aavePoolAddress: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2'
+            },
+            sepolia: {
+                chainId: '0xaa36a7',
+                chainName: 'Sepolia test network',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://sepolia.infura.io/v3/'],
+                blockExplorerUrls: ['https://sepolia.etherscan.io/'],
+                aavePoolAddress: '0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951'
+            },
+            polygon: {
+                chainId: '0x89',
+                chainName: 'Polygon Mainnet',
+                nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+                rpcUrls: ['https://polygon-rpc.com/'],
+                blockExplorerUrls: ['https://polygonscan.com/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD'
+            },
+            arbitrum: {
+                chainId: '0xa4b1',
+                chainName: 'Arbitrum One',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://arb1.arbitrum.io/rpc'],
+                blockExplorerUrls: ['https://arbiscan.io/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD'
+            },
+            optimism: {
+                chainId: '0xa',
+                chainName: 'Optimism',
+                nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.optimism.io'],
+                blockExplorerUrls: ['https://optimistic.etherscan.io/'],
+                aavePoolAddress: '0x794a61358D6845594F94dc1DB02A252b5b4814aD'
+            },
+            bsc: {
+                chainId: '0x38',
+                chainName: 'BNB Smart Chain',
+                nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                blockExplorerUrls: ['https://bscscan.com/'],
+                aavePoolAddress: null // Aave V3 is not available on BSC
+            }
+        };
+        
+        // Current network (default to Mainnet)
+        let currentNetwork = 'mainnet';
+        
+        // Get current network configuration
+        function getCurrentNetworkConfig() {
+            return NETWORKS[currentNetwork];
+        }
+        
+        // Initialize AAVE_POOL_ADDRESS after network configuration
+        AAVE_POOL_ADDRESS = getCurrentNetworkConfig().aavePoolAddress;
+        
+        // Switch to specified network
+        async function switchToNetwork(networkKey) {
+            try {
+                if (!NETWORKS[networkKey]) {
+                    throw new Error(`Unsupported network: ${networkKey}`);
+                }
+                
+                const networkConfig = NETWORKS[networkKey];
+                
+                if (typeof window.ethereum === 'undefined') {
+                    throw new Error('MetaMask is not installed');
+                }
+                
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId !== networkConfig.chainId) {
+                    showAlert(`Switching to ${networkConfig.chainName}...`, 'info');
+                    
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: networkConfig.chainId }]
+                        });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [networkConfig]
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+                    
+                    // Update current network
+                    currentNetwork = networkKey;
+                    
+                    // Update contract addresses
+                    const config = getCurrentNetworkConfig();
+                    AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                    
+                    // Update asset selector for new network
+                    updateAssetSelector();
+                    
+                    // Reinitialize contracts with new network assets
+                    if (provider && signer) {
+                        initializeContracts();
+                    }
+                    
+                    showAlert(`Successfully switched to ${networkConfig.chainName}`, 'success');
+                    
+                    // Reconnect wallet if already connected
+                    if (userAddress) {
+                        await connectWallet();
+                    }
+                }
+                return true;
+            } catch (error) {
+                showAlert(`Failed to switch network: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Handle network selection change
+        async function onNetworkChange() {
+            const networkSelect = document.getElementById('network-switcher');
+            const selectedNetwork = networkSelect.value;
+            
+            if (selectedNetwork !== currentNetwork) {
+                await switchToNetwork(selectedNetwork);
+            }
+        }
+        
+        // Check and switch to Sepolia network (legacy function for compatibility)
+        async function ensureSepoliaNetwork() {
+            return await switchToNetwork('sepolia');
+        }
+        
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum !== 'undefined') {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    
+                    // Get current network and update UI
+                    const currentNetworkInfo = await provider.getNetwork();
+                    const networkKey = Object.keys(NETWORKS).find(key =>
+                        parseInt(NETWORKS[key].chainId, 16) === currentNetworkInfo.chainId
+                    );
+                    
+                    if (networkKey) {
+                        currentNetwork = networkKey;
+                        document.getElementById('network-switcher').value = networkKey;
+                        
+                        // Check if Aave V3 is available on this network
+                        const config = getCurrentNetworkConfig();
+                        if (config.aavePoolAddress === null) {
+                            showAlert(`Aave V3 is not available on ${config.chainName}. Please switch to Ethereum, Polygon, Arbitrum, or Optimism to use Aave V3 features.`, 'warning');
+                            // Still allow connection but disable Aave features
+                            AAVE_POOL_ADDRESS = null;
+                        } else {
+                            AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                        }
+                    } else {
+                        showAlert('Unsupported network. Please switch to a supported network.', 'error');
+                        return;
+                    }
+                    
+                    userAddress = await signer.getAddress();
+                    
+                    // Initialize contracts
+                    initializeContracts();
+                    
+                    const shortAddress = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
+                    document.getElementById('wallet-address-nav').textContent = shortAddress;
+                    document.getElementById('nav-connect-btn').style.display = 'none';
+                    document.getElementById('wallet-connected').style.display = 'flex';
+                    document.getElementById('connection-alert').style.display = 'none';
+                    
+                    await updateUI();
+                    showAlert('Wallet connected successfully!', 'success');
+                } else {
+                    showAlert('Please install MetaMask wallet', 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to connect wallet: ' + error.message, 'error');
+            }
+        }
+        
+        // Disconnect wallet
+        function disconnectWallet() {
+            userAddress = null;
+            provider = null;
+            signer = null;
+            aavePool = null;
+            usdtContract = null;
+            aUsdtContract = null;
+            
+            // Reset UI to disconnected state
+            document.getElementById('nav-connect-btn').style.display = 'inline-block';
+            document.getElementById('wallet-connected').style.display = 'none';
+            document.getElementById('connection-alert').style.display = 'block';
+            
+            // Clear displayed data
+            document.getElementById('supplied-balance').textContent = '0';
+            document.getElementById('earned-interest').textContent = '0';
+            document.getElementById('wallet-usdt-balance').innerHTML = '<span class="text-lg">0.00</span> <span class="text-sm text-yellow-300">USDT</span>';
+            document.getElementById('apy-rate').textContent = '0%';
+            
+            showAlert('Wallet disconnected successfully', 'success');
+        }
+        
+        // Supply asset to Aave
+        async function supplyAsset() {
+            try {
+                // Check if Aave V3 is available on current network
+                if (!AAVE_POOL_ADDRESS) {
+                    showAlert('Aave V3 is not available on the current network. Please switch to Ethereum, Polygon, Arbitrum, or Optimism.', 'error');
+                    return;
+                }
+                
+                const amount = document.getElementById('supply-amount').value;
+                if (!amount || amount <= 0) {
+                    showAlert('Please enter a valid amount to supply', 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                const assetConfig = getCurrentAssetConfig();
+                const decimals = await assetContract.decimals();
+                const amountWei = ethers.utils.parseUnits(amount, decimals);
+                
+                // Check user balance first
+                const userBalance = await assetContract.balanceOf(userAddress);
+                if (userBalance.lt(amountWei)) {
+                    showAlert(`Insufficient ${assetConfig.symbol} balance. You have ${ethers.utils.formatUnits(userBalance, decimals)} ${assetConfig.symbol}`, 'error');
+                    return;
+                }
+                
+                // Check allowance
+                const allowance = await assetContract.allowance(userAddress, AAVE_POOL_ADDRESS);
+                
+                if (allowance.lt(amountWei)) {
+                    showAlert(`Approving ${assetConfig.symbol} spending...`, 'info');
+                    const approveTx = await assetContract.approve(AAVE_POOL_ADDRESS, amountWei);
+                    await approveTx.wait();
+                    showAlert(`${assetConfig.symbol} spending approved`, 'success');
+                }
+                
+                // Supply to Aave
+                showAlert(`Supplying ${assetConfig.symbol} to Aave V3...`, 'info');
+                const supplyTx = await aavePool.supply(assetConfig.address, amountWei, userAddress, 0);
+                await supplyTx.wait();
+                
+                showAlert(`Successfully supplied ${amount} ${assetConfig.symbol} to Aave V3!`, 'success');
+                document.getElementById('supply-amount').value = '';
+                await updateUI();
+                
+            } catch (error) {
+                console.error('Supply error:', error);
+                let errorMessage = 'Supply failed: ';
+                
+                if (error.message.includes('execution reverted: 51')) {
+                    errorMessage += 'Insufficient balance or invalid token amount';
+                } else if (error.message.includes('execution reverted: 52')) {
+                    errorMessage += 'Asset is not active for supply';
+                } else if (error.message.includes('execution reverted: 53')) {
+                    errorMessage += 'Asset is frozen';
+                } else if (error.message.includes('User denied transaction')) {
+                    errorMessage += 'Transaction was cancelled by user';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showAlert(errorMessage, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Withdraw asset from Aave
+        async function withdrawAsset() {
+            try {
+                // Check if Aave V3 is available on current network
+                if (!AAVE_POOL_ADDRESS) {
+                    showAlert('Aave V3 is not available on the current network. Please switch to Ethereum, Polygon, Arbitrum, or Optimism.', 'error');
+                    return;
+                }
+                
+                const amount = document.getElementById('withdraw-amount').value;
+                if (!amount || amount <= 0) {
+                    showAlert('Please enter a valid amount to withdraw', 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                const assetConfig = getCurrentAssetConfig();
+                const decimals = await assetContract.decimals();
+                const amountWei = ethers.utils.parseUnits(amount, decimals);
+                
+                // Check aToken balance first
+                const aTokenBalance = await aTokenContract.balanceOf(userAddress);
+                if (aTokenBalance.lt(amountWei)) {
+                    showAlert(`Insufficient ${assetConfig.symbol} supplied balance. You have ${ethers.utils.formatUnits(aTokenBalance, decimals)} ${assetConfig.symbol} supplied`, 'error');
+                    return;
+                }
+                
+                showAlert(`Withdrawing ${assetConfig.symbol} from Aave V3...`, 'info');
+                const withdrawTx = await aavePool.withdraw(assetConfig.address, amountWei, userAddress);
+                await withdrawTx.wait();
+                
+                showAlert(`Successfully withdrew ${amount} ${assetConfig.symbol} from Aave V3!`, 'success');
+                document.getElementById('withdraw-amount').value = '';
+                await updateUI();
+                
+            } catch (error) {
+                console.error('Withdraw error:', error);
+                let errorMessage = 'Withdraw failed: ';
+                
+                if (error.message.includes('execution reverted: 51')) {
+                    errorMessage += 'Insufficient supplied balance';
+                } else if (error.message.includes('execution reverted: 52')) {
+                    errorMessage += 'Asset is not active for withdrawal';
+                } else if (error.message.includes('execution reverted: 53')) {
+                    errorMessage += 'Asset is frozen';
+                } else if (error.message.includes('User denied transaction')) {
+                    errorMessage += 'Transaction was cancelled by user';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showAlert(errorMessage, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Withdraw maximum available
+        async function withdrawMax() {
+            try {
+                // Check if Aave V3 is available on current network
+                if (!AAVE_POOL_ADDRESS) {
+                    showAlert('Aave V3 is not available on the current network. Please switch to Ethereum, Polygon, Arbitrum, or Optimism.', 'error');
+                    return;
+                }
+                
+                const aTokenBalance = await aTokenContract.balanceOf(userAddress);
+                const decimals = await assetContract.decimals();
+                const maxAmount = ethers.utils.formatUnits(aTokenBalance, decimals);
+                
+                document.getElementById('withdraw-amount').value = maxAmount;
+                
+            } catch (error) {
+                showAlert('Failed to get max withdrawable amount: ' + error.message, 'error');
+            }
+        }
+        
+        // Update UI with current data
+        async function updateUI() {
+            if (!userAddress || !aavePool) return;
+            
+            try {
+                const assetConfig = getCurrentAssetConfig();
+                
+                // Get wallet balance
+                const walletBalance = await assetContract.balanceOf(userAddress);
+                const decimals = await assetContract.decimals();
+                const walletBalanceFormatted = ethers.utils.formatUnits(walletBalance, decimals);
+                document.getElementById('wallet-balance-amount').textContent = parseFloat(walletBalanceFormatted).toFixed(4);
+                document.getElementById('wallet-asset-symbol').textContent = assetConfig.symbol;
+                
+                // Get supplied balance (aToken balance)
+                const aTokenBalance = await aTokenContract.balanceOf(userAddress);
+                const suppliedBalanceFormatted = ethers.utils.formatUnits(aTokenBalance, decimals);
+                document.getElementById('supplied-balance').textContent = parseFloat(suppliedBalanceFormatted).toFixed(4);
+                
+                // Calculate earned interest (simplified - actual calculation would need initial supply amount)
+                const earnedInterest = Math.max(0, parseFloat(suppliedBalanceFormatted) * 0.02); // Simplified 2% example
+                document.getElementById('earned-interest').textContent = earnedInterest.toFixed(4);
+                
+                // Get current supply APY (correct calculation)
+                try {
+                    const reserveData = await aavePool.getReserveData(assetConfig.address);
+                    const liquidityRate = reserveData.currentLiquidityRate;
+                    
+                    // Convert from ray (1e27) to percentage
+                    // Aave liquidityRate is already annualized in ray units
+                    const liquidityRateDecimal = parseFloat(liquidityRate.toString()) / 1e27;
+                    
+                    // Check for valid rate
+                    if (liquidityRateDecimal <= 0 || !isFinite(liquidityRateDecimal)) {
+                        document.getElementById('apy-rate').textContent = '0.0000%';
+                    } else {
+                        // Convert to APY percentage
+                        // liquidityRate is already annualized, so we just convert to percentage
+                        const apy = (liquidityRateDecimal * 100).toFixed(4);
+                        document.getElementById('apy-rate').textContent = apy + '%';
+                    }
+                } catch (error) {
+                    console.error('Error fetching APY:', error);
+                    document.getElementById('apy-rate').textContent = 'N/A';
+                }
+                
+            } catch (error) {
+                console.error('Error updating UI:', error);
+            }
+        }
+        
+        // Show alert
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            
+            let bgColor, textColor, icon;
+            switch (type) {
+                case 'success':
+                    bgColor = 'bg-green-500/20';
+                    textColor = 'text-green-400';
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-500/20';
+                    textColor = 'text-red-400';
+                    icon = 'fas fa-exclamation-circle';
+                    break;
+                case 'info':
+                    bgColor = 'bg-blue-500/20';
+                    textColor = 'text-blue-400';
+                    icon = 'fas fa-info-circle';
+                    break;
+                default:
+                    bgColor = 'bg-gray-500/20';
+                    textColor = 'text-gray-400';
+                    icon = 'fas fa-bell';
+            }
+            
+            alertDiv.className = `${bgColor} border border-gray-600 rounded-xl p-4 mb-4 flex items-center space-x-3`;
+            alertDiv.innerHTML = `
+                <i class="${icon} ${textColor}"></i>
+                <span class="${textColor}">${message}</span>
+            `;
+            
+            alertsContainer.appendChild(alertDiv);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+        
+        // Show/hide loading
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.remove('hidden');
+            } else {
+                loading.classList.add('hidden');
+            }
+        }
+        
+        // Asset selector change event
+        document.getElementById('asset-selector').addEventListener('change', async (e) => {
+            currentAsset = e.target.value;
+            
+            // Update UI labels
+            const assetConfig = getCurrentAssetConfig();
+            document.getElementById('supplied-asset-symbol').textContent = assetConfig.symbol;
+            document.getElementById('interest-asset-symbol').textContent = assetConfig.symbol;
+            document.getElementById('wallet-asset-symbol').textContent = assetConfig.symbol;
+            
+            // Update input labels
+            document.querySelector('label[for="supply-amount"]').textContent = `Amount (${assetConfig.symbol})`;
+            document.querySelector('label[for="withdraw-amount"]').textContent = `Amount (${assetConfig.symbol})`;
+            
+            // Reinitialize contracts if wallet is connected
+            if (provider && signer) {
+                initializeContracts();
+                await updateUI();
+            }
+        });
+        
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            // Update asset selector for current network
+            updateAssetSelector();
+            
+            // Initialize asset selector UI
+            const assetConfig = getCurrentAssetConfig();
+            document.getElementById('supplied-asset-symbol').textContent = assetConfig.symbol;
+            document.getElementById('interest-asset-symbol').textContent = assetConfig.symbol;
+            document.getElementById('wallet-asset-symbol').textContent = assetConfig.symbol;
+            document.querySelector('label[for="supply-amount"]').textContent = `Amount (${assetConfig.symbol})`;
+            document.querySelector('label[for="withdraw-amount"]').textContent = `Amount (${assetConfig.symbol})`;
+            
+            // Check if wallet is already connected
+            if (typeof window.ethereum !== 'undefined') {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    await connectWallet();
+                }
+            }
+        });
+        
+        // Add network switcher event listener
+        const networkSwitcher = document.getElementById('network-switcher');
+        if (networkSwitcher) {
+            networkSwitcher.addEventListener('change', onNetworkChange);
+        }
+        
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectWallet();
+                } else {
+                    connectWallet();
+                }
+            });
+            
+            window.ethereum.on('chainChanged', async (chainId) => {
+                // Find the network key for the new chain ID
+                const networkKey = Object.keys(NETWORKS).find(key => 
+                    NETWORKS[key].chainId === chainId
+                );
+                
+                if (networkKey) {
+                    // Update current network
+                    currentNetwork = networkKey;
+                    
+                    // Update network selector
+                    const networkSelect = document.getElementById('network-switcher');
+                    if (networkSelect) {
+                        networkSelect.value = networkKey;
+                    }
+                    
+                    // Update contract addresses
+                    const config = getCurrentNetworkConfig();
+                    AAVE_POOL_ADDRESS = config.aavePoolAddress;
+                    
+                    // Update asset selector for new network
+                    updateAssetSelector();
+                    
+                    // Reinitialize contracts with new network assets
+                    if (provider && signer) {
+                        initializeContracts();
+                    }
+                    
+                    // Reconnect wallet if connected
+                    if (userAddress) {
+                        await connectWallet();
+                    }
+                    
+                    showAlert(`Switched to ${NETWORKS[networkKey].chainName}`, 'success');
+                } else {
+                    showAlert('Unsupported network. Please switch to a supported network.', 'error');
+                    disconnectWallet();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
