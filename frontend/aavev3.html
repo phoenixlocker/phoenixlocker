@@ -595,8 +595,21 @@
                         const config = getCurrentNetworkConfig();
                         if (config.aavePoolAddress === null) {
                             showAlert(`Aave V3 is not available on ${config.chainName}. Please switch to Ethereum, Polygon, Arbitrum, or Optimism to use Aave V3 features.`, 'warning');
-                            // Still allow connection but disable Aave features
-                            AAVE_POOL_ADDRESS = null;
+                            
+                            // Auto-switch to Ethereum Mainnet
+                            showAlert('Automatically switching to Ethereum Mainnet...', 'info');
+                            try {
+                                await switchToNetwork('mainnet');
+                                // After successful switch, reconnect
+                                setTimeout(() => {
+                                    connectWallet();
+                                }, 1000);
+                                return;
+                            } catch (switchError) {
+                                showAlert('Failed to switch to Ethereum Mainnet: ' + switchError.message, 'error');
+                                // Still allow connection but disable Aave features
+                                AAVE_POOL_ADDRESS = null;
+                            }
                         } else {
                             AAVE_POOL_ADDRESS = config.aavePoolAddress;
                         }
